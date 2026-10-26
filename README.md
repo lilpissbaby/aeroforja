@@ -6,7 +6,15 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 
 ## Requisitos
 
-- Node ≥ 22 y pnpm 10 (`corepack enable` si no lo tienes).
+- Node ≥ 22.18 (ejecuta TypeScript directamente en `pnpm isa`) y pnpm 10.
+- En Windows (PowerShell):
+
+  ```powershell
+  winget install OpenJS.NodeJS.LTS   # si no tienes Node; abre después una ventana nueva
+  npm install -g pnpm@10
+  # Si PowerShell dice que la ejecución de scripts está deshabilitada:
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  ```
 
 ## Comandos
 
