@@ -1,0 +1,18 @@
+{
+  "name": "@aeroforja/validation",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Published reference cases (with source, transcription provenance and tolerance) and the validation tests that hold the physics core to them.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aeroforja/physics": "workspace:*"
+  }
+}

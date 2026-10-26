@@ -1,0 +1,23 @@
+{
+  "name": "aeroforja",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "AeroForja: design, analyse and simulate drones before building them. Physics core, validation cases and (later) the web app.",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "check": "pnpm typecheck && pnpm test",
+    "isa": "node --disable-warning=ExperimentalWarning examples/isa.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

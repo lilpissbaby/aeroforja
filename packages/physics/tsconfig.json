@@ -1,0 +1,11 @@
+{
+  // Source only. lib is ES2022 without DOM and types is empty, so any use of
+  // browser or Node APIs (document, window, fetch, process, fs...) fails to
+  // compile. This enforces "physics imports nothing from the UI or the browser".
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

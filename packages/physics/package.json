@@ -1,0 +1,15 @@
+{
+  "name": "@aeroforja/physics",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Pure physics core: SI units, result envelope with provenance and validity, ISA atmosphere. No UI, no browser or Node APIs.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  }
+}
