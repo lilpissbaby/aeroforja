@@ -126,7 +126,11 @@ describe("result envelope", () => {
   it("carries provenance, methods with references and assumptions", () => {
     const r = atmosphere({ altitude: geopotential(0) });
     expect(r.provenance).toBe("CALCULATED");
-    expect(r.methods.map((m) => m.id)).toStrictEqual(["isa-troposphere", "sutherland-viscosity"]);
+    expect(r.methods.map((m) => m.id)).toStrictEqual([
+      "isa-troposphere",
+      "ideal-gas-air",
+      "sutherland-viscosity",
+    ]);
     for (const m of r.methods) expect(m.references.length).toBeGreaterThan(0);
     expect(r.assumptions.map((a) => a.id)).toContain("dry-air");
   });

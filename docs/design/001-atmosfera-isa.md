@@ -50,7 +50,40 @@ Para la temperatura no se fija un límite rojo porque no tenemos una cota citada
 - La validación usa las tablas ICAO (−5 a 11 km) en lugar de las de la U.S. Standard Atmosphere a 0–3 000 m: el escaneo de la NASA no es legible y la transcripción ICAO es contrastable. El modelo es el mismo en este tramo.
 - Al cubrir toda la capa, el verde abarca de −5 000 a 11 000 m y desaparece la banda ámbar de altitud.
 
+## Ampliación aprobada el 27-10-2026: humedad y condiciones medidas
+
+### Humedad (entrada opcional)
+
+- Método: mezcla ideal de aire seco y vapor (ley de Dalton), ρ = (p − e)/(R_d·T) + e/(R_v·T), con e = HR · e_s(T).
+- Presión de saturación sobre agua líquida: forma de Magnus con las constantes de Alduchov y Eskridge (1996): e_s = 610,94 Pa · exp(17,625·t / (t + 243,04)), t en °C.
+- R_v = R*/M_w, con el R* de ICAO y M_w = 18,01528 kg/kmol, coherente con R_d.
+- Supuestos:
+  - Se desprecia la compresibilidad del aire real, que llega a un 0,07 % en densidad.
+  - La viscosidad y la velocidad del sonido son las del aire seco a esa temperatura. El vapor las cambia poco en aire templado y hasta unos pocos por ciento en aire caliente y saturado. Para el Mach de punta de hélice es irrelevante, pero queda declarado.
+- Validez de la humedad:
+
+| Comprobación | Verde | Ámbar | Rojo |
+|---|---|---|---|
+| Temperatura con humedad | 0 a 50 °C | −40 a 0 °C (rango del ajuste de Magnus, sin validar aquí) | fuera de −40 a 50 °C |
+| Presión con humedad | 70 a 105 kPa | resto | — |
+
+- Validación:
+
+| Caso | Referencia | Tolerancia | Error máximo |
+|---|---|---|---|
+| Presión de saturación, 0 a 50 °C | IAPWS-95 | 0,3 % | 0,25 % |
+| Densidad de aire húmedo, 90 puntos (70 a 105 kPa, 0 a 50 °C, HR 0 / 50 / 100 %) | Modelo de gas real ASHRAE RP-1485 | 0,1 % | 0,071 % |
+
+- Procedencia de los números de referencia: calculados con CoolProp 8.0.0, la implementación abierta de referencia de esos dos modelos publicados. Están en `packages/validation` con su versión exacta para poder regenerarlos.
+- En la propuesta la humedad iba siempre en ámbar porque no tenía validación. Ahora la tiene, así que dentro de la caja validada el semáforo es verde, como define la especificación.
+
+### Condiciones medidas
+
+`measuredAtmosphere({ pressure, temperature, relativeHumidity? })` calcula el estado del aire a partir de la presión de estación, la temperatura y la humedad (opcional) que mides tú, sin usar la altitud. Es para comparar con ensayos reales.
+
+- La presión es la que lee el barómetro en el sitio, no el QNH reducido a nivel del mar.
+- Validez de la presión en aire seco: verde entre 22,6 y 177,7 kPa, el rango que cubren las filas ICAO.
+
 ## Pendiente
 
-- Humedad (presiones parciales + Magnus, Alduchov y Eskridge 1996): pendiente de decisión.
-- Condiciones medidas (presión y temperatura de un barómetro): propuesta para comparar con ensayos reales en el MVP.
+- Incertidumbre de las condiciones medidas (propagar u(p), u(T) y u(HR) a ρ).

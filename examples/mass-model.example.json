@@ -1,0 +1,56 @@
+{
+  "_note": "Synthetic test body with round numbers, NOT a real aircraft. Replace every component with your own weighed parts (provenance MEASURED) and measured positions. Units: kg, m, body axes FRD (x forward, y right, z down) from the reference point.",
+  "referencePoint": "frame centre, top plate",
+  "components": [
+    {
+      "id": "frame",
+      "name": "Frame plates (placeholder)",
+      "mass": { "value": 0.1, "standardUncertainty": 0.002, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": 0, "y": 0, "z": 0.005 },
+      "inertia": { "kind": "box", "size": { "x": 0.12, "y": 0.12, "z": 0.006 } }
+    },
+    {
+      "id": "battery",
+      "name": "Battery (placeholder)",
+      "mass": { "value": 0.2, "standardUncertainty": 0.002, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": 0.01, "y": 0, "z": -0.02 },
+      "positionUncertainty": { "frame": "FRD", "x": 0.003, "y": 0.001, "z": 0.001 },
+      "inertia": { "kind": "box", "size": { "x": 0.075, "y": 0.035, "z": 0.03 } }
+    },
+    {
+      "id": "motor-fr",
+      "name": "Motor front right (placeholder)",
+      "mass": { "value": 0.03, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": 0.08, "y": 0.08, "z": -0.01 },
+      "inertia": { "kind": "cylinder", "radius": 0.014, "length": 0.018, "axis": "z" }
+    },
+    {
+      "id": "motor-rl",
+      "name": "Motor rear left (placeholder)",
+      "mass": { "value": 0.03, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": -0.08, "y": -0.08, "z": -0.01 },
+      "inertia": { "kind": "cylinder", "radius": 0.014, "length": 0.018, "axis": "z" }
+    },
+    {
+      "id": "motor-fl",
+      "name": "Motor front left (placeholder)",
+      "mass": { "value": 0.03, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": 0.08, "y": -0.08, "z": -0.01 },
+      "inertia": { "kind": "cylinder", "radius": 0.014, "length": 0.018, "axis": "z" }
+    },
+    {
+      "id": "motor-rr",
+      "name": "Motor rear right (placeholder)",
+      "mass": { "value": 0.03, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": -0.08, "y": 0.08, "z": -0.01 },
+      "inertia": { "kind": "cylinder", "radius": 0.014, "length": 0.018, "axis": "z" }
+    },
+    {
+      "id": "camera",
+      "name": "Camera (placeholder)",
+      "mass": { "value": 0.01, "provenance": "ESTIMATED" },
+      "position": { "frame": "FRD", "x": 0.05, "y": 0, "z": 0.01 },
+      "inertia": { "kind": "point" }
+    }
+  ]
+}

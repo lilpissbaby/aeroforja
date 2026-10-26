@@ -9,4 +9,9 @@
 export * from "./core/units.ts";
 export type * from "./core/result.ts";
 export { checkRange, combineValidity, type RangeCheckSpec } from "./core/validity.ts";
+export * from "./core/vector.ts";
+export * as mat3 from "./core/mat3.ts";
+export type { Mat3 } from "./core/mat3.ts";
+export * from "./core/rotation.ts";
 export * from "./atmosphere/index.ts";
+export * from "./mass/index.ts";

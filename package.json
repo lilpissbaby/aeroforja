@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --no-bail typecheck",
     "check": "pnpm typecheck && pnpm test",
-    "isa": "node --disable-warning=ExperimentalWarning examples/isa.ts"
+    "isa": "node --disable-warning=ExperimentalWarning examples/isa.ts",
+    "air": "node --disable-warning=ExperimentalWarning examples/air.ts",
+    "mass": "node --disable-warning=ExperimentalWarning examples/mass.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

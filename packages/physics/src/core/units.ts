@@ -17,6 +17,9 @@ declare const unitBrand: unique symbol;
 export type Quantity<U extends string> = number & { readonly [unitBrand]: U };
 
 export type Meters = Quantity<"m">;
+export type Kilograms = Quantity<"kg">;
+export type KilogramSquareMeters = Quantity<"kg*m^2">;
+export type Radians = Quantity<"rad">;
 export type Kelvin = Quantity<"K">;
 export type Pascals = Quantity<"Pa">;
 export type KilogramsPerCubicMeter = Quantity<"kg/m^3">;
@@ -53,6 +56,10 @@ export function quantity<U extends string>(value: number, unit: U): Quantity<U> 
 const brand = quantity;
 
 export const meters = (value: number): Meters => brand(value, "m");
+export const kilograms = (value: number): Kilograms => brand(value, "kg");
+export const kilogramSquareMeters = (value: number): KilogramSquareMeters =>
+  brand(value, "kg*m^2");
+export const radians = (value: number): Radians => brand(value, "rad");
 export const kelvin = (value: number): Kelvin => brand(value, "K");
 export const pascals = (value: number): Pascals => brand(value, "Pa");
 export const kilogramsPerCubicMeter = (value: number): KilogramsPerCubicMeter =>

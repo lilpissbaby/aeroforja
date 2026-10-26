@@ -2,7 +2,9 @@
 
 Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos, con física publicada, rango de validez visible y comprobación contra ensayos reales.
 
-**Estado: PoC en curso.** Entrega 1: núcleo físico con unidades SI, envoltorio de resultados y atmósfera ISA validada.
+**Estado: PoC en curso.**
+- Entrega 1: unidades SI, envoltorio de resultados y atmósfera ISA validada.
+- Entrega 2: humedad y condiciones medidas, y modelo de masas (CG, inercia e incertidumbre).
 
 ## Requisitos
 
@@ -23,15 +25,20 @@ pnpm install
 pnpm test        # tests unitarios + validación física (Vitest)
 pnpm typecheck   # TypeScript estricto en todos los paquetes
 pnpm check       # las dos cosas
-pnpm isa 1500    # atmósfera a 1 500 m geométricos, con método, supuestos y semáforo
-pnpm isa 1500 10 # lo mismo en un día ISA + 10 K
+pnpm isa 1500        # atmósfera a 1 500 m geométricos, con método, supuestos y semáforo
+pnpm isa 1500 10 70  # lo mismo en un día ISA + 10 K con 70 % de humedad
+pnpm air 1008 24 65  # aire medido: 1008 hPa de estación, 24 °C, 65 % de humedad
+pnpm mass            # masa, CG e inercia del cuerpo sintético de ejemplo
+pnpm mass mi-quad.json  # ...o de tu propio modelo (mismo formato que examples/mass-model.example.json)
 ```
 
 ## Estructura
 
 ```
 packages/
-  physics/      núcleo puro: unidades SI, Result<T>, atmósfera ISA (sin UI, sin APIs de navegador ni de Node)
+  physics/      núcleo puro: unidades SI, vectores FRD/NED, cuaterniones, Result<T>,
+                atmósfera (ISA, humedad, condiciones medidas) y modelo de masas
+                (sin UI, sin APIs de navegador ni de Node)
   validation/   casos de referencia publicados, con fuente, cadena de transcripción y tolerancia
 examples/       scripts de consola para ver resultados
 docs/design/    mini-diseños aprobados, uno por módulo físico

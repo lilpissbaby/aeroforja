@@ -1,23 +1,28 @@
 /**
- * International Standard Atmosphere, lowest layer (troposphere).
+ * Air properties: International Standard Atmosphere (lowest layer) and
+ * measured ambient conditions, optionally with humidity.
  *
- * Method: ICAO Doc 7488/3 (1993) = ISO 2533:1975 = U.S. Standard Atmosphere
- * 1976 below 32 km. Temperature falls linearly with geopotential altitude H;
- * pressure follows from hydrostatic balance of an ideal gas with constant g0:
+ * Standard atmosphere — ICAO Doc 7488/3 (1993) = ISO 2533:1975 = U.S.
+ * Standard Atmosphere 1976 below 32 km. Temperature falls linearly with
+ * geopotential altitude H; pressure follows from hydrostatic balance of an
+ * ideal gas with constant g0:
  *
  *   T(H)  = T0 + L * H
  *   p(H)  = p0 * (T / T0)^(-g0 / (L * R))
- *   rho   = p / (R * T)
- *   mu    = beta * T^1.5 / (T + S)          (Sutherland)
+ *
+ * Air state from (p, T, RH), shared by both entry points:
+ *
+ *   rho   = (p - e) / (R_d T) + e / (R_v T),  e = RH * e_s(T)   (dry: e = 0)
+ *   mu    = beta * T^1.5 / (T + S)                              (Sutherland)
  *   nu    = mu / rho
- *   a     = sqrt(gamma * R * T)
+ *   a     = sqrt(gamma * R_d * T)
  *
- * Non-standard temperature (ISA + dT, or a given temperature): pressure stays
- * the ISA value at that altitude (the altitude acts as a pressure altitude) and
- * density follows from the ideal gas law with the actual temperature.
+ * Non-standard temperature in the ISA (ISA + dT, or a given temperature):
+ * pressure stays the ISA value at that altitude (pressure altitude) and
+ * density follows from the actual temperature.
  *
- * Validated against ICAO Doc 7488/3 tabulated values from H = -5000 m to
- * H = 11000 m (see packages/validation). Humidity is not modelled.
+ * Measured conditions: pressure and temperature come from the user's
+ * barometer and thermometer; no altitude is involved.
  */
 import type { Assumption, Method, Result, ValidityCheck } from "../core/result.ts";
 import {
@@ -28,6 +33,7 @@ import {
   pascalSeconds,
   pascals,
   squareMetersPerSecond,
+  type Dimensionless,
   type Kelvin,
   type KilogramsPerCubicMeter,
   type Meters,
@@ -51,7 +57,20 @@ import {
   TROPOSPHERE_BASE_ALTITUDE,
   TROPOSPHERE_LAPSE_RATE,
 } from "./constants.ts";
-import { GEOPOTENTIAL_ALTITUDE, ISA_TROPOSPHERE, SUTHERLAND_VISCOSITY } from "./methods.ts";
+import {
+  HUMID_AIR_PRESSURE_RANGE,
+  HUMID_AIR_TEMPERATURE_RANGE,
+  MAGNUS_SATURATION_PRESSURE,
+  MOIST_AIR_PARTIAL_PRESSURES,
+  WATER_VAPOUR_GAS_CONSTANT,
+  saturationVapourPressure,
+} from "./humidity.ts";
+import {
+  GEOPOTENTIAL_ALTITUDE,
+  IDEAL_GAS_AIR,
+  ISA_TROPOSPHERE,
+  SUTHERLAND_VISCOSITY,
+} from "./methods.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -75,27 +94,48 @@ export interface AtmosphereQuery {
   readonly altitude: AltitudeInput;
   /** Defaults to the standard temperature at that altitude. */
   readonly temperature?: TemperatureInput;
+  /** Relative humidity over liquid water, as a fraction 0..1. Omit for dry air. */
+  readonly relativeHumidity?: Dimensionless;
 }
 
-export interface AtmosphereState {
-  readonly geopotentialAltitude: Meters;
+/** Ambient conditions measured by the user (barometer, thermometer, hygrometer). */
+export interface MeasuredAmbient {
+  /** Static (station) pressure, not the sea-level QNH value. */
+  readonly pressure: Pascals;
+  readonly temperature: Kelvin;
+  /** Relative humidity over liquid water, as a fraction 0..1. Omit for dry air. */
+  readonly relativeHumidity?: Dimensionless;
+}
+
+export interface AirState {
   readonly temperature: Kelvin;
   readonly pressure: Pascals;
+  /** Partial pressure of water vapour; 0 for dry air. */
+  readonly vapourPressure: Pascals;
   readonly density: KilogramsPerCubicMeter;
   readonly dynamicViscosity: PascalSeconds;
   readonly kinematicViscosity: SquareMetersPerSecond;
   readonly speedOfSound: MetersPerSecond;
 }
 
+export interface AtmosphereState extends AirState {
+  readonly geopotentialAltitude: Meters;
+}
+
 /** Display units of every field, checked by the compiler against the types. */
-export const ATMOSPHERE_STATE_UNITS = {
-  geopotentialAltitude: "m",
+export const AIR_STATE_UNITS = {
   temperature: "K",
   pressure: "Pa",
+  vapourPressure: "Pa",
   density: "kg/m^3",
   dynamicViscosity: "Pa*s",
   kinematicViscosity: "m^2/s",
   speedOfSound: "m/s",
+} as const satisfies UnitsOf<AirState>;
+
+export const ATMOSPHERE_STATE_UNITS = {
+  geopotentialAltitude: "m",
+  ...AIR_STATE_UNITS,
 } as const satisfies UnitsOf<AtmosphereState>;
 
 // ---------------------------------------------------------------------------
@@ -122,6 +162,12 @@ export const ISA_ALTITUDE_RANGE = {
  */
 export const ISA_TEMPERATURE_RANGE = {
   validated: { min: 216.65, max: 320.65 },
+  applicable: { min: 0, max: Number.POSITIVE_INFINITY },
+} as const;
+
+/** Dry-air pressures covered by the standard-atmosphere reference rows. */
+export const DRY_AIR_PRESSURE_RANGE = {
+  validated: { min: 22632, max: 177687 },
   applicable: { min: 0, max: Number.POSITIVE_INFINITY },
 } as const;
 
@@ -165,6 +211,16 @@ const ASSUMPTIONS = {
     id: "dry-air",
     description: "Dry air: humidity is neglected (humid air is less dense than dry air).",
   },
+  moistAir: {
+    id: "moist-air-ideal-mixture",
+    description:
+      "Moist air is an ideal mixture of dry air and water vapour; real-gas compressibility (about 0.07 % on density) is neglected.",
+  },
+  moistTransport: {
+    id: "moist-air-dry-transport",
+    description:
+      "Viscosity and speed of sound are those of dry air at the same temperature: the effect of water vapour on them is not modelled (small in temperate air, up to a few percent in hot saturated air).",
+  },
   idealGas: {
     id: "ideal-gas",
     description: "Air is an ideal gas with R = 287.05287 J/(kg*K) and gamma = 1.4.",
@@ -183,19 +239,115 @@ const ASSUMPTIONS = {
     description:
       "Pressure is the standard value at this altitude (the altitude acts as a pressure altitude); only the temperature departs from standard. Real pressure also varies with the weather.",
   },
+  measuredAmbient: {
+    id: "measured-ambient",
+    description:
+      "Pressure, temperature and humidity are the user's measurements; the result is as accurate as those instruments.",
+  },
 } as const satisfies Record<string, Assumption>;
+
+// ---------------------------------------------------------------------------
+// Shared air-state computation
+// ---------------------------------------------------------------------------
+
+interface AirStateParts {
+  readonly state: AirState;
+  readonly checks: ValidityCheck[];
+  readonly methods: Method[];
+  readonly assumptions: Assumption[];
+}
+
+function computeAirState(
+  pressure: number,
+  temperature: number,
+  relativeHumidity: number | undefined,
+): AirStateParts {
+  if (!(temperature > 0)) {
+    throw new RangeError(`Air temperature must be above 0 K, got ${temperature} K.`);
+  }
+  if (!(pressure > 0)) {
+    throw new RangeError(`Air pressure must be above 0 Pa, got ${pressure} Pa.`);
+  }
+  if (relativeHumidity !== undefined && !(relativeHumidity >= 0 && relativeHumidity <= 1)) {
+    throw new RangeError(
+      `Relative humidity is a fraction between 0 and 1, got ${relativeHumidity}.`,
+    );
+  }
+
+  const humid = relativeHumidity !== undefined;
+  const vapourPressure = humid ? relativeHumidity * saturationVapourPressure(temperature) : 0;
+  if (!(vapourPressure < pressure)) {
+    throw new RangeError(
+      `Vapour pressure ${vapourPressure} Pa is not below the total pressure ${pressure} Pa.`,
+    );
+  }
+
+  const density =
+    (pressure - vapourPressure) / (AIR_GAS_CONSTANT * temperature) +
+    vapourPressure / (WATER_VAPOUR_GAS_CONSTANT * temperature);
+  const dynamicViscosity = sutherlandViscosity(temperature);
+
+  const state: AirState = {
+    temperature: kelvin(temperature),
+    pressure: pascals(pressure),
+    vapourPressure: pascals(vapourPressure),
+    density: kilogramsPerCubicMeter(density),
+    dynamicViscosity: pascalSeconds(dynamicViscosity),
+    kinematicViscosity: squareMetersPerSecond(dynamicViscosity / density),
+    speedOfSound: metersPerSecond(
+      Math.sqrt(AIR_HEAT_CAPACITY_RATIO * AIR_GAS_CONSTANT * temperature),
+    ),
+  };
+
+  const checks: ValidityCheck[] = [
+    checkRange({
+      quantity: "temperature",
+      value: temperature,
+      unit: "K",
+      ...ISA_TEMPERATURE_RANGE,
+      note: "Sutherland's law and the ideal-gas density are validated between 216.65 K and 320.65 K. Outside that band no validation case covers them.",
+    }),
+  ];
+  const methods: Method[] = [IDEAL_GAS_AIR, SUTHERLAND_VISCOSITY];
+  const assumptions: Assumption[] = [ASSUMPTIONS.idealGas];
+
+  if (humid) {
+    checks.push(
+      checkRange({
+        quantity: "humidAirTemperature",
+        value: temperature,
+        unit: "K",
+        ...HUMID_AIR_TEMPERATURE_RANGE,
+        note: "Magnus saturation pressure is fitted from -40 to 50 degrees C and validated here from 0 to 50 degrees C (IAPWS-95, ASHRAE RP-1485).",
+      }),
+      checkRange({
+        quantity: "humidAirPressure",
+        value: pressure,
+        unit: "Pa",
+        ...HUMID_AIR_PRESSURE_RANGE,
+        note: "Moist-air density is validated against ASHRAE RP-1485 between 70 kPa and 105 kPa.",
+      }),
+    );
+    methods.push(MOIST_AIR_PARTIAL_PRESSURES, MAGNUS_SATURATION_PRESSURE);
+    assumptions.push(ASSUMPTIONS.moistAir, ASSUMPTIONS.moistTransport);
+  } else {
+    assumptions.push(ASSUMPTIONS.dryAir);
+  }
+
+  return { state, checks, methods, assumptions };
+}
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * Air properties at an altitude, with method, assumptions and validity.
+ * Air properties at an altitude in the standard atmosphere, with method,
+ * assumptions and validity.
  *
  * Outside the lowest standard layer (H < -5000 m or H > 11000 m) the
  * troposphere law no longer applies: the values are still returned so the UI
- * can show them, but validity is red. Throws on non-physical input (a
- * temperature at or below 0 K).
+ * can show them, but validity is red. Throws on non-physical input.
  */
 export function atmosphere(query: AtmosphereQuery): Result<AtmosphereState> {
   const { altitude } = query;
@@ -217,23 +369,8 @@ export function atmosphere(query: AtmosphereQuery): Result<AtmosphereState> {
       : temperatureInput.kind === "offset"
         ? standardT + temperatureInput.deltaT
         : temperatureInput.value;
-  if (!(actualT > 0)) {
-    throw new RangeError(`Air temperature must be above 0 K, got ${actualT} K.`);
-  }
 
-  const pressure = standardPressure(standardT);
-  const density = pressure / (AIR_GAS_CONSTANT * actualT);
-  const dynamicViscosity = sutherlandViscosity(actualT);
-
-  const value: AtmosphereState = {
-    geopotentialAltitude: geopotential,
-    temperature: kelvin(actualT),
-    pressure: pascals(pressure),
-    density: kilogramsPerCubicMeter(density),
-    dynamicViscosity: pascalSeconds(dynamicViscosity),
-    kinematicViscosity: squareMetersPerSecond(dynamicViscosity / density),
-    speedOfSound: metersPerSecond(Math.sqrt(AIR_HEAT_CAPACITY_RATIO * AIR_GAS_CONSTANT * actualT)),
-  };
+  const air = computeAirState(standardPressure(standardT), actualT, query.relativeHumidity);
 
   const checks: ValidityCheck[] = [
     checkRange({
@@ -243,21 +380,11 @@ export function atmosphere(query: AtmosphereQuery): Result<AtmosphereState> {
       ...ISA_ALTITUDE_RANGE,
       note: "Lowest layer of the standard atmosphere (H from -5000 m to the tropopause at 11000 m). Above 11000 m the temperature gradient changes and this law does not apply.",
     }),
-    checkRange({
-      quantity: "temperature",
-      value: actualT,
-      unit: "K",
-      ...ISA_TEMPERATURE_RANGE,
-      note: "Sutherland's law and the ideal-gas density are validated between 216.65 K and 320.65 K. Outside that band no validation case covers them.",
-    }),
+    ...air.checks,
   ];
 
-  const methods: Method[] = [ISA_TROPOSPHERE, SUTHERLAND_VISCOSITY];
-  const assumptions: Assumption[] = [
-    ASSUMPTIONS.dryAir,
-    ASSUMPTIONS.idealGas,
-    ASSUMPTIONS.standardGravity,
-  ];
+  const methods: Method[] = [ISA_TROPOSPHERE, ...air.methods];
+  const assumptions: Assumption[] = [...air.assumptions, ASSUMPTIONS.standardGravity];
   if (altitude.kind === "geometric") {
     methods.push(GEOPOTENTIAL_ALTITUDE);
     assumptions.push(ASSUMPTIONS.geometricConversion);
@@ -267,10 +394,36 @@ export function atmosphere(query: AtmosphereQuery): Result<AtmosphereState> {
   }
 
   return {
-    value,
+    value: { geopotentialAltitude: geopotential, ...air.state },
     provenance: "CALCULATED",
     methods,
     assumptions,
+    validity: combineValidity(checks),
+  };
+}
+
+/**
+ * Air properties from measured pressure and temperature (and optionally
+ * humidity), for comparing simulations with real tests. Use the station
+ * pressure read on site, not the sea-level QNH of a weather report.
+ */
+export function measuredAtmosphere(ambient: MeasuredAmbient): Result<AirState> {
+  const air = computeAirState(ambient.pressure, ambient.temperature, ambient.relativeHumidity);
+  const checks: ValidityCheck[] = [
+    checkRange({
+      quantity: "pressure",
+      value: ambient.pressure,
+      unit: "Pa",
+      ...DRY_AIR_PRESSURE_RANGE,
+      note: "Ideal-gas density of dry air is validated between 22.6 kPa and 177.7 kPa (standard-atmosphere reference rows).",
+    }),
+    ...air.checks,
+  ];
+  return {
+    value: air.state,
+    provenance: "CALCULATED",
+    methods: air.methods,
+    assumptions: [ASSUMPTIONS.measuredAmbient, ...air.assumptions],
     validity: combineValidity(checks),
   };
 }

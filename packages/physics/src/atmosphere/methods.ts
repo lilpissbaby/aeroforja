@@ -21,6 +21,12 @@ export const ISA_TROPOSPHERE: Method = {
   references: [ICAO_DOC_7488, ISO_2533, US_STANDARD_ATMOSPHERE_1976],
 };
 
+export const IDEAL_GAS_AIR: Method = {
+  id: "ideal-gas-air",
+  name: "Ideal-gas equation of state for air, p = rho R T, with the constants of the standard atmosphere",
+  references: [ICAO_DOC_7488],
+};
+
 export const SUTHERLAND_VISCOSITY: Method = {
   id: "sutherland-viscosity",
   name: "Sutherland's law for the dynamic viscosity of air, with the constants of the standard atmosphere",

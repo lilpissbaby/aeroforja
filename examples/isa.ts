@@ -1,35 +1,33 @@
 /**
- * Prints the full ISA result envelope for an altitude.
+ * Standard atmosphere at a geometric altitude.
  *
- *   pnpm isa 1500            -> geometric altitude 1500 m, standard day
+ *   pnpm isa 1500            -> 1500 m, standard day, dry air
  *   pnpm isa 1500 10         -> same, ISA + 10 K
+ *   pnpm isa 1500 10 70      -> same, 70 % relative humidity
  *   pnpm isa 12000           -> above the tropopause: red
  */
-import { atmosphere, kelvin, meters, ATMOSPHERE_STATE_UNITS } from "../packages/physics/src/index.ts";
+import {
+  ATMOSPHERE_STATE_UNITS,
+  atmosphere,
+  dimensionless,
+  kelvin,
+  meters,
+} from "../packages/physics/src/index.ts";
+import { printResult } from "./print.ts";
 
-const [altitudeArg = "0", deltaTArg] = process.argv.slice(2);
+const [altitudeArg = "0", deltaTArg, humidityArg] = process.argv.slice(2);
 const altitude = Number(altitudeArg);
-const deltaT = deltaTArg === undefined ? undefined : Number(deltaTArg);
+const deltaT = deltaTArg === undefined ? 0 : Number(deltaTArg);
+const humidityPercent = humidityArg === undefined ? undefined : Number(humidityArg);
 
 const result = atmosphere({
   altitude: { kind: "geometric", value: meters(altitude) },
-  ...(deltaT === undefined ? {} : { temperature: { kind: "offset", deltaT: kelvin(deltaT) } as const }),
+  ...(deltaT === 0 ? {} : { temperature: { kind: "offset", deltaT: kelvin(deltaT) } as const }),
+  ...(humidityPercent === undefined ? {} : { relativeHumidity: dimensionless(humidityPercent / 100) }),
 });
 
-console.log(`Geometric altitude ${altitude} m${deltaT === undefined ? "" : `, ISA ${deltaT >= 0 ? "+" : ""}${deltaT} K`}`);
-for (const [key, unit] of Object.entries(ATMOSPHERE_STATE_UNITS)) {
-  const value = result.value[key as keyof typeof result.value];
-  console.log(`  ${key.padEnd(22)} ${value.toPrecision(6).padStart(12)} ${unit}`);
-}
-console.log(`Provenance: ${result.provenance}`);
-console.log(`Validity:   ${result.validity.level.toUpperCase()}`);
-for (const check of result.validity.checks) {
-  console.log(`  - ${check.quantity}: ${check.level} (validated ${check.validated.min}..${check.validated.max} ${check.unit})`);
-}
-console.log("Methods:");
-for (const method of result.methods) {
-  console.log(`  - ${method.name}`);
-  for (const ref of method.references) console.log(`      ${ref.citation}`);
-}
-console.log("Assumptions:");
-for (const assumption of result.assumptions) console.log(`  - ${assumption.description}`);
+console.log(
+  `Geometric altitude ${altitude} m, ISA ${deltaT >= 0 ? "+" : ""}${deltaT} K, ` +
+    (humidityPercent === undefined ? "dry air" : `RH ${humidityPercent} %`),
+);
+printResult(result, ATMOSPHERE_STATE_UNITS);
