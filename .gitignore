@@ -3,3 +3,7 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Third-party raw datasets (e.g. UIUC Propeller Database zips).
+# Kept out of git until their redistribution terms are settled.
+data/raw/
