@@ -5,6 +5,7 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 **Estado: PoC en curso.**
 - Entrega 1: unidades SI, envoltorio de resultados y atmósfera ISA validada.
 - Entrega 2: humedad y condiciones medidas, y modelo de masas (CG, inercia e incertidumbre).
+- Entrega 3: la app web con el visor 3D básico (modelo de masas editable, CG, ejes, aire), con la física en un Web Worker.
 
 ## Requisitos
 
@@ -22,6 +23,9 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 
 ```bash
 pnpm install
+pnpm dev         # la app en http://localhost:5173 (se recarga sola al cambiar el código)
+pnpm build       # versión de producción en packages/app/dist
+pnpm preview     # sirve esa versión en http://localhost:4173
 pnpm test        # tests unitarios + validación física (Vitest)
 pnpm typecheck   # TypeScript estricto en todos los paquetes
 pnpm check       # las dos cosas
@@ -40,11 +44,21 @@ packages/
                 atmósfera (ISA, humedad, condiciones medidas) y modelo de masas
                 (sin UI, sin APIs de navegador ni de Node)
   validation/   casos de referencia publicados, con fuente, cadena de transcripción y tolerancia
-examples/       scripts de consola para ver resultados
+  app/          interfaz web (Vite + React + three.js); la física corre en un Web Worker
+examples/       scripts de consola y el modelo de ejemplo
 docs/design/    mini-diseños aprobados, uno por módulo físico
+docs/decisiones.md  decisiones cerradas y abiertas
+data/raw/       datos de terceros sin procesar (fuera de git)
 ```
 
-Vendrán `data/` (hélices UIUC, perfiles, motores, baterías), `solvers-wasm/`, `cfd-webgpu/`, `app/` y `docker/` según la hoja de ruta.
+Vendrán `data/` procesado (hélices UIUC, perfiles, motores, baterías), `solvers-wasm/`, `cfd-webgpu/` y `docker/` según la hoja de ruta.
+
+## La app
+
+- Visor 3D: piezas, ejes cuerpo FRD desde el origen, CG con su símbolo y ejes principales de inercia. Clic en una pieza para editarla.
+- Panel derecho: masa con su incertidumbre y procedencia, posición en mm, orientación en grados (secuencia z-y-x) y forma.
+- Panel inferior: masa y CG, inercia, aire y avisos. Cada resultado lleva su semáforo, su procedencia y, a un clic, el método, las referencias y los supuestos.
+- El trabajo se guarda en el navegador entre sesiones. Para copias o para pasarlo a otro equipo, usa «Guardar JSON» y «Abrir JSON».
 
 ## Reglas del núcleo
 

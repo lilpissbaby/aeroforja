@@ -1,0 +1,302 @@
+/**
+ * Basic 3D viewer of the mass model: parts, body axes FRD, centre of gravity
+ * and principal axes. three.js scene axes are not FRD; every position and
+ * rotation goes through src/three/frames.ts.
+ */
+import { createContext, useContext, useMemo, useRef, type RefObject } from "react";
+import { Canvas } from "@react-three/fiber";
+import { Billboard, Edges, Grid, Html, Line, OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import {
+  rotationMatrix,
+  toTriple,
+  type InertiaSpec,
+  type Mat3,
+  type MassComponent,
+  type Triple,
+} from "@aeroforja/physics";
+import { useAppStore } from "../state/store.ts";
+import { boxSizeInScene, frdToThree, rotationFrdToThree } from "../three/frames.ts";
+
+export interface ScenePalette {
+  readonly part: string;
+  readonly partMeasured: string;
+  readonly accent: string;
+  readonly ink: string;
+  readonly paper: string;
+  readonly axis: string;
+  readonly principal: string;
+  readonly gridCell: string;
+  readonly gridSection: string;
+}
+
+export const SCENE_PALETTE: Readonly<Record<"light" | "dark", ScenePalette>> = {
+  light: {
+    part: "#9aa6a8",
+    partMeasured: "#6f7d80",
+    accent: "#8f5f35",
+    ink: "#1a2225",
+    paper: "#f7f8f7",
+    axis: "#3d484c",
+    principal: "#5b676b",
+    gridCell: "#c3cbc8",
+    gridSection: "#a3aeab",
+  },
+  dark: {
+    part: "#59686d",
+    partMeasured: "#7a8b90",
+    accent: "#cc9663",
+    ink: "#e1e7e4",
+    paper: "#1d2427",
+    axis: "#b9c4c1",
+    principal: "#95a3a6",
+    gridCell: "#26323a",
+    gridSection: "#3a4952",
+  },
+};
+
+/**
+ * Labels are rendered into a fixed overlay element. Without an explicit
+ * portal, drei's Html changes its target once the canvas connects its events
+ * and the labels mounted before that stay empty.
+ */
+const LabelLayer = createContext<RefObject<HTMLDivElement | null> | null>(null);
+
+function Label({ position, className, children }: { position: Triple; className: string; children: string }) {
+  const layer = useContext(LabelLayer);
+  return (
+    <Html
+      position={position}
+      className={className}
+      zIndexRange={[10, 0]}
+      {...(layer !== null ? { portal: layer as RefObject<HTMLElement> } : {})}
+    >
+      {children}
+    </Html>
+  );
+}
+
+const MIN_SIZE = 1e-4;
+const pos = (v: number) => Math.max(v, MIN_SIZE);
+
+function toThreeQuaternion(r: Mat3): THREE.Quaternion {
+  const m = new THREE.Matrix4().set(r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, 0, 0, 0, 1);
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+/** Rotation that turns three's cylinder axis (+y) onto the component axis, in scene-local terms. */
+const CYLINDER_ROTATION: Readonly<Record<"x" | "y" | "z", Triple>> = {
+  x: [Math.PI / 2, 0, 0],
+  y: [0, 0, -Math.PI / 2],
+  z: [0, 0, 0],
+};
+
+function PartShape({ inertia, color, selected, edgeColor }: {
+  inertia: InertiaSpec;
+  color: string;
+  selected: boolean;
+  edgeColor: string;
+}) {
+  const material = <meshStandardMaterial color={color} roughness={0.85} metalness={0.05} />;
+  const edges = selected ? <Edges color={edgeColor} threshold={20} /> : null;
+  switch (inertia.kind) {
+    case "box":
+      return (
+        <mesh>
+          <boxGeometry args={boxSizeInScene({ x: pos(inertia.size.x), y: pos(inertia.size.y), z: pos(inertia.size.z) })} />
+          {material}
+          {edges}
+        </mesh>
+      );
+    case "cylinder":
+      return (
+        <mesh rotation={CYLINDER_ROTATION[inertia.axis]}>
+          <cylinderGeometry args={[pos(inertia.radius), pos(inertia.radius), pos(inertia.length), 32]} />
+          {material}
+          {edges}
+        </mesh>
+      );
+    case "tube":
+      return (
+        <mesh rotation={CYLINDER_ROTATION[inertia.axis]}>
+          <cylinderGeometry args={[pos(inertia.outerRadius), pos(inertia.outerRadius), pos(inertia.length), 24]} />
+          {material}
+          {edges}
+        </mesh>
+      );
+    case "sphere":
+      return (
+        <mesh>
+          <sphereGeometry args={[pos(inertia.radius), 32, 16]} />
+          {material}
+          {edges}
+        </mesh>
+      );
+    case "point":
+      return (
+        <mesh>
+          <sphereGeometry args={[0.004, 16, 8]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+      );
+    case "given":
+      return (
+        <mesh>
+          <octahedronGeometry args={[0.008]} />
+          {material}
+          {edges}
+        </mesh>
+      );
+  }
+}
+
+function Part({ component, selected, palette, onSelect }: {
+  component: MassComponent;
+  selected: boolean;
+  palette: ScenePalette;
+  onSelect: (id: string) => void;
+}) {
+  const position = frdToThree(toTriple(component.position));
+  const quaternion = useMemo(
+    () =>
+      component.orientation === undefined
+        ? new THREE.Quaternion()
+        : toThreeQuaternion(rotationFrdToThree(rotationMatrix(component.orientation))),
+    [component.orientation],
+  );
+  const base = component.mass.provenance === "MEASURED" ? palette.partMeasured : palette.part;
+  return (
+    <group
+      position={position}
+      quaternion={quaternion}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(component.id);
+      }}
+    >
+      <PartShape inertia={component.inertia} color={selected ? palette.accent : base} selected={selected} edgeColor={palette.ink} />
+    </group>
+  );
+}
+
+/** The classic quartered centre-of-gravity roundel, always facing the camera and drawn on top. */
+function CgMarker({ position, radius, palette }: { position: Triple; radius: number; palette: ScenePalette }) {
+  return (
+    <Billboard position={position}>
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} renderOrder={10}>
+          <circleGeometry args={[radius, 16, (i * Math.PI) / 2, Math.PI / 2]} />
+          <meshBasicMaterial color={i % 2 === 0 ? palette.ink : palette.paper} depthTest={false} transparent />
+        </mesh>
+      ))}
+      <mesh renderOrder={11}>
+        <ringGeometry args={[radius, radius * 1.15, 48]} />
+        <meshBasicMaterial color={palette.ink} depthTest={false} transparent />
+      </mesh>
+      <Label position={[radius * 1.4, radius * 1.4, 0]} className="label-3d cg">
+        CG
+      </Label>
+    </Billboard>
+  );
+}
+
+function BodyAxes({ length, palette }: { length: number; palette: ScenePalette }) {
+  const axes: readonly [Triple, string][] = [
+    [[length, 0, 0], "x adelante"],
+    [[0, length, 0], "y derecha"],
+    [[0, 0, length], "z abajo"],
+  ];
+  return (
+    <group>
+      {axes.map(([frd, label]) => {
+        const end = frdToThree(frd);
+        return (
+          <group key={label}>
+            <Line points={[[0, 0, 0], end]} color={palette.axis} lineWidth={1.5} />
+            <Label position={end} className="label-3d">
+              {label}
+            </Label>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
+  const palette = SCENE_PALETTE[theme];
+  const components = useAppStore((s) => s.model.components);
+  const selectedId = useAppStore((s) => s.selectedId);
+  const select = useAppStore((s) => s.select);
+  const massOutcome = useAppStore((s) => s.results?.mass);
+  const labelLayer = useRef<HTMLDivElement>(null);
+
+  const mass = massOutcome?.ok === true ? massOutcome.result.value : null;
+  const cg: Triple = mass === null ? [0, 0, 0] : frdToThree(toTriple(mass.centerOfGravity.value));
+
+  const { extent, groundY } = useMemo(() => {
+    let maxDistance = 0.05;
+    let lowest = 0;
+    for (const c of components) {
+      const p = frdToThree(toTriple(c.position));
+      maxDistance = Math.max(maxDistance, Math.hypot(p[0] - cg[0], p[1] - cg[1], p[2] - cg[2]));
+      lowest = Math.min(lowest, p[1] - 0.03);
+    }
+    return { extent: maxDistance + 0.05, groundY: lowest };
+  }, [components, cg[0], cg[1], cg[2]]);
+
+  const principalLines = mass === null
+    ? []
+    : mass.principal.axes.map((a) => {
+        const d = frdToThree([a.x, a.y, a.z]);
+        const l = extent * 0.7;
+        return [
+          [cg[0] - d[0] * l, cg[1] - d[1] * l, cg[2] - d[2] * l],
+          [cg[0] + d[0] * l, cg[1] + d[1] * l, cg[2] + d[2] * l],
+        ] as [Triple, Triple];
+      });
+
+  return (
+    <div className="viewer">
+      <LabelLayer.Provider value={labelLayer}>
+      <Canvas
+        camera={{ position: [cg[0] + extent * 1.6, cg[1] + extent * 1.3, cg[2] + extent * 2.0], fov: 40, near: 0.002, far: 50 }}
+        gl={{ alpha: true, antialias: true }}
+        onPointerMissed={() => select(null)}
+        aria-label="Visor 3D del aparato"
+      >
+        <ambientLight intensity={0.55} />
+        <directionalLight position={[1, 2, 1.5]} intensity={1.1} />
+        <directionalLight position={[-1.5, 0.5, -1]} intensity={0.35} />
+        <Grid
+          position={[0, groundY, 0]}
+          args={[2, 2]}
+          cellSize={0.01}
+          cellThickness={0.6}
+          cellColor={palette.gridCell}
+          sectionSize={0.1}
+          sectionThickness={1}
+          sectionColor={palette.gridSection}
+          fadeDistance={Math.max(1.5, extent * 8)}
+          fadeStrength={1.5}
+          infiniteGrid
+        />
+        <BodyAxes length={Math.max(0.06, extent * 0.45)} palette={palette} />
+        {components.map((c) => (
+          <Part key={c.id} component={c} selected={c.id === selectedId} palette={palette} onSelect={select} />
+        ))}
+        {principalLines.map((pts, i) => (
+          <Line key={i} points={pts} color={palette.principal} lineWidth={1} dashed dashSize={0.006} gapSize={0.006} />
+        ))}
+        {mass !== null && <CgMarker position={cg} radius={Math.max(0.006, extent * 0.045)} palette={palette} />}
+        <OrbitControls makeDefault target={cg} enableDamping={false} />
+      </Canvas>
+      </LabelLayer.Provider>
+      <div className="label-layer" ref={labelLayer} />
+      <p className="viewer-legend">
+        Arrastra para girar, rueda para acercar, clic en una pieza para editarla. Ejes cuerpo FRD desde el origen; líneas
+        discontinuas: ejes principales de inercia.
+      </p>
+    </div>
+  );
+}
