@@ -3,8 +3,8 @@
  * and principal axes. three.js scene axes are not FRD; every position and
  * rotation goes through src/three/frames.ts.
  */
-import { createContext, useContext, useMemo, useRef, type RefObject } from "react";
-import { Canvas } from "@react-three/fiber";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Billboard, Edges, Grid, Html, Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -17,6 +17,10 @@ import {
 } from "@aeroforja/physics";
 import { useAppStore } from "../state/store.ts";
 import { boxSizeInScene, frdToThree, rotationFrdToThree } from "../three/frames.ts";
+import { ExportButtons } from "./planform/ExportButtons.tsx";
+import { PlanformBodies } from "./planform/PlanformBodies.tsx";
+import { analysisFor, usePlanformAnalysis } from "./planform/usePlanformAnalysis.ts";
+import type { PlanformAnalysis } from "../planform/geometry.ts";
 
 export interface ScenePalette {
   readonly part: string;
@@ -28,6 +32,9 @@ export interface ScenePalette {
   readonly principal: string;
   readonly gridCell: string;
   readonly gridSection: string;
+  readonly planPlate: string;
+  readonly planWing: string;
+  readonly rotor: string;
 }
 
 export const SCENE_PALETTE: Readonly<Record<"light" | "dark", ScenePalette>> = {
@@ -41,6 +48,9 @@ export const SCENE_PALETTE: Readonly<Record<"light" | "dark", ScenePalette>> = {
     principal: "#5b676b",
     gridCell: "#c3cbc8",
     gridSection: "#a3aeab",
+    planPlate: "#c49a6c",
+    planWing: "#a9b8bd",
+    rotor: "#3d6f8f",
   },
   dark: {
     part: "#59686d",
@@ -52,6 +62,9 @@ export const SCENE_PALETTE: Readonly<Record<"light" | "dark", ScenePalette>> = {
     principal: "#95a3a6",
     gridCell: "#26323a",
     gridSection: "#3a4952",
+    planPlate: "#9c7247",
+    planWing: "#6f8288",
+    rotor: "#7fb4d6",
   },
 };
 
@@ -223,27 +236,100 @@ function BodyAxes({ length, palette }: { length: number; palette: ScenePalette }
   );
 }
 
+interface Content {
+  readonly center: Triple;
+  readonly radius: number;
+  /** Lowest scene y of what is shown, m. */
+  readonly lowest: number;
+}
+
+/** Bounding sphere of what is on screen, in scene axes. */
+function contentOf(
+  components: readonly MassComponent[],
+  analysis: PlanformAnalysis,
+  show: { readonly planform: boolean; readonly mass: boolean },
+): Content {
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  const add = (p: Triple) => {
+    min.min(new THREE.Vector3(...p));
+    max.max(new THREE.Vector3(...p));
+  };
+  if (show.mass) {
+    for (const c of components) {
+      const p = frdToThree(toTriple(c.position));
+      add([p[0] - 0.02, p[1] - 0.02, p[2] - 0.02]);
+      add([p[0] + 0.02, p[1] + 0.02, p[2] + 0.02]);
+    }
+  }
+  if (show.planform && analysis.bounds !== null) {
+    const zs = [
+      ...analysis.layers.flatMap((l) => [l.z - l.thickness / 2, l.z + l.thickness / 2]),
+      ...analysis.rotors.map((r) => r.z),
+    ];
+    const b = analysis.bounds;
+    for (const x of [b.minX, b.maxX]) for (const y of [b.minY, b.maxY]) for (const z of zs) add(frdToThree([x, y, z]));
+  }
+  if (!Number.isFinite(min.x)) {
+    add([-0.05, -0.05, -0.05]);
+    add([0.05, 0.05, 0.05]);
+  }
+  const center = min.clone().add(max).multiplyScalar(0.5);
+  return {
+    center: [center.x, center.y, center.z],
+    radius: Math.max(0.05, max.clone().sub(min).length() / 2),
+    lowest: min.y,
+  };
+}
+
+/**
+ * Places the camera so everything shown fills the view, looking from
+ * front-right and above. It reads the latest state when asked, not the
+ * deferred analysis, so a template applied a moment ago is framed whole.
+ */
+function FitCamera({ token }: { token: number }) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update(): void } | null;
+  useEffect(() => {
+    const state = useAppStore.getState();
+    const { center: c, radius: r } = contentOf(state.model.components, analysisFor(state.planform), state.show3d);
+    const direction = new THREE.Vector3(0.8, 0.65, 1.0).normalize();
+    const distance = (r / Math.sin(((camera.fov ?? 40) * Math.PI) / 360)) * 1.05;
+    camera.position.set(c[0] + direction.x * distance, c[1] + direction.y * distance, c[2] + direction.z * distance);
+    camera.near = Math.max(distance / 500, 1e-4);
+    camera.far = distance * 50;
+    camera.updateProjectionMatrix();
+    if (controls !== null) {
+      controls.target.set(c[0], c[1], c[2]);
+      controls.update();
+    }
+  }, [token, controls, camera]);
+  return null;
+}
+
 export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
   const palette = SCENE_PALETTE[theme];
   const components = useAppStore((s) => s.model.components);
   const selectedId = useAppStore((s) => s.selectedId);
   const select = useAppStore((s) => s.select);
   const massOutcome = useAppStore((s) => s.results?.mass);
+  const planform = useAppStore((s) => s.planform);
+  const planSelectedId = useAppStore((s) => s.planSelectedId);
+  const selectPlanElement = useAppStore((s) => s.selectPlanElement);
+  const show = useAppStore((s) => s.show3d);
+  const setShow = useAppStore((s) => s.setShow3d);
+  const fitRequest = useAppStore((s) => s.fitRequest);
+  const analysis = usePlanformAnalysis();
   const labelLayer = useRef<HTMLDivElement>(null);
+  const [localFit, setLocalFit] = useState(0);
 
   const mass = massOutcome?.ok === true ? massOutcome.result.value : null;
   const cg: Triple = mass === null ? [0, 0, 0] : frdToThree(toTriple(mass.centerOfGravity.value));
 
-  const { extent, groundY } = useMemo(() => {
-    let maxDistance = 0.05;
-    let lowest = 0;
-    for (const c of components) {
-      const p = frdToThree(toTriple(c.position));
-      maxDistance = Math.max(maxDistance, Math.hypot(p[0] - cg[0], p[1] - cg[1], p[2] - cg[2]));
-      lowest = Math.min(lowest, p[1] - 0.03);
-    }
-    return { extent: maxDistance + 0.05, groundY: lowest };
-  }, [components, cg[0], cg[1], cg[2]]);
+  const content = useMemo(() => contentOf(components, analysis, show), [components, analysis, show]);
+
+  const extent = content.radius;
+  const groundY = Math.min(0, content.lowest) - 0.01;
 
   const principalLines = mass === null
     ? []
@@ -260,9 +346,12 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
     <div className="viewer">
       <LabelLayer.Provider value={labelLayer}>
       <Canvas
-        camera={{ position: [cg[0] + extent * 1.6, cg[1] + extent * 1.3, cg[2] + extent * 2.0], fov: 40, near: 0.002, far: 50 }}
+        camera={{ position: [0.3, 0.25, 0.4], fov: 40, near: 0.002, far: 50 }}
         gl={{ alpha: true, antialias: true }}
-        onPointerMissed={() => select(null)}
+        onPointerMissed={() => {
+          select(null);
+          selectPlanElement(null);
+        }}
         aria-label="Visor 3D del aparato"
       >
         <ambientLight intensity={0.55} />
@@ -282,17 +371,41 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
           infiniteGrid
         />
         <BodyAxes length={Math.max(0.06, extent * 0.45)} palette={palette} />
-        {components.map((c) => (
+        {show.planform && (
+          <PlanformBodies
+            planform={planform}
+            analysis={analysis}
+            selectedId={planSelectedId}
+            palette={{ plate: palette.planPlate, wing: palette.planWing, rotor: palette.rotor, accent: palette.accent }}
+            onSelect={selectPlanElement}
+          />
+        )}
+        {show.mass && components.map((c) => (
           <Part key={c.id} component={c} selected={c.id === selectedId} palette={palette} onSelect={select} />
         ))}
-        {principalLines.map((pts, i) => (
+        {show.mass && principalLines.map((pts, i) => (
           <Line key={i} points={pts} color={palette.principal} lineWidth={1} dashed dashSize={0.006} gapSize={0.006} />
         ))}
-        {mass !== null && <CgMarker position={cg} radius={Math.max(0.006, extent * 0.045)} palette={palette} />}
-        <OrbitControls makeDefault target={cg} enableDamping={false} />
+        {show.mass && mass !== null && <CgMarker position={cg} radius={Math.max(0.006, extent * 0.045)} palette={palette} />}
+        <OrbitControls makeDefault enableDamping={false} />
+        <FitCamera token={fitRequest * 1000 + localFit} />
       </Canvas>
       </LabelLayer.Provider>
       <div className="label-layer" ref={labelLayer} />
+      <div className="viewer-tools">
+        <label className="inline check">
+          <input type="checkbox" checked={show.planform} onChange={(e) => setShow({ planform: e.target.checked })} />
+          <span>Planta en 3D</span>
+        </label>
+        <label className="inline check">
+          <input type="checkbox" checked={show.mass} onChange={(e) => setShow({ mass: e.target.checked })} />
+          <span>Piezas de masa y CG</span>
+        </label>
+        <button type="button" className="button" onClick={() => setLocalFit((n) => n + 1)}>
+          Encuadrar
+        </button>
+        <ExportButtons compact />
+      </div>
       <p className="viewer-legend">
         Arrastra para girar, rueda para acercar, clic en una pieza para editarla. Ejes cuerpo FRD desde el origen; líneas
         discontinuas: ejes principales de inercia.

@@ -1,0 +1,14 @@
+# AeroForja on your own computer: http://localhost:8080
+#   docker compose -f docker/docker-compose.local.yml up -d --build
+# Change the left side of "ports" if 8080 is taken.
+
+services:
+  aeroforja:
+    container_name: aeroforja-local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: aeroforja:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"

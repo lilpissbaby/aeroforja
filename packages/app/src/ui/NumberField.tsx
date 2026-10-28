@@ -15,6 +15,8 @@ interface NumberFieldProps {
   readonly exclusiveMin?: boolean;
   readonly max?: number;
   readonly placeholder?: string;
+  /** Keeps the label for screen readers only (compact tables). */
+  readonly hideLabel?: boolean;
 }
 
 const show = (value: number | null, decimals: number): string =>
@@ -78,7 +80,9 @@ export function NumberField(props: NumberFieldProps) {
 
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className={props.hideLabel === true ? "visually-hidden" : undefined}>
+        {label}
+      </label>
       <div className="field-input">
         <input
           id={id}

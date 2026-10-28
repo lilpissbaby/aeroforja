@@ -20,6 +20,14 @@
   --warn: #9a6210;
   --bad: #b3372a;
   --focus: #1f6fb2;
+  --plane: #f4f6f5;
+  --grid-minor: #e2e7e5;
+  --grid-major: #c5cecb;
+  --axis: #5b676b;
+  --plate-fill: #c49a6c66;
+  --wing-fill: #8fa6b066;
+  --rotor: #3d6f8f;
+  --rotor-fill: #3d6f8f14;
 
   --font-ui: "Barlow", system-ui, sans-serif;
   --font-num: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
@@ -45,6 +53,14 @@
   --warn: #e0a640;
   --bad: #ef7466;
   --focus: #6fb3ee;
+  --plane: #192125;
+  --grid-minor: #222c31;
+  --grid-major: #34424a;
+  --axis: #95a3a6;
+  --plate-fill: #cc966352;
+  --wing-fill: #8fa6b04d;
+  --rotor: #7fb4d6;
+  --rotor-fill: #7fb4d61a;
   color-scheme: dark;
 }
 
@@ -112,7 +128,7 @@ select {
 .left {
   grid-area: left;
 }
-.viewer {
+.workspace {
   grid-area: view;
 }
 .right {
@@ -141,7 +157,7 @@ select {
 @media (max-width: 900px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 55vh auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
     grid-template-areas: "top" "view" "left" "right" "bottom";
     height: auto;
   }
@@ -330,6 +346,99 @@ select {
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-bottom: 8px;
+}
+.grid-2 .field input:not(.text-input) {
+  width: 100%;
+  min-width: 0;
+}
+.grid-2 .field select {
+  width: 100%;
+}
+
+.left > .tabs button[aria-selected="true"] {
+  border-bottom-color: var(--mdf);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+details.template {
+  border-top: 1px solid var(--rule);
+  padding: 8px 0;
+}
+details.template summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+details.template .field {
+  margin-bottom: 6px;
+}
+
+.vertex-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--size-s);
+}
+.vertex-table th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  padding: 0 4px 4px 0;
+}
+.vertex-table td {
+  padding: 2px 4px 2px 0;
+  vertical-align: top;
+}
+.vertex-table .field input:not(.text-input) {
+  width: 8ch;
+}
+.icon-button {
+  border: 1px solid var(--rule);
+  background: var(--field);
+  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  line-height: 1;
+  color: var(--bad);
+}
+.icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.role-tag {
+  color: var(--muted);
+  font-size: var(--size-s);
+}
+.dot-bad {
+  color: var(--bad);
+}
+.issue {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 0 0;
+  font-size: var(--size-s);
+}
+button.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.plan-issues {
+  margin-top: 12px;
 }
 
 /* ---------- component list ---------- */
@@ -537,12 +646,389 @@ details.method .ref {
   background: var(--paper);
 }
 
+/* ---------- workspace ---------- */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.view-switch {
+  display: flex;
+  gap: 2px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+.view-switch button,
+.left > .tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.view-switch button[aria-selected="true"] {
+  border-bottom-color: var(--mdf);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.workspace-panes {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.workspace-panes > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.view-split .workspace-panes > .plan-editor {
+  border-right: 1px solid var(--rule);
+}
+
+@media (max-width: 900px) {
+  .workspace-panes {
+    flex-direction: column;
+  }
+  .workspace-panes > * {
+    flex: none;
+    height: 60vh;
+  }
+  .view-split .workspace-panes > .plan-editor {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+}
+
+/* ---------- planform editor ---------- */
+
+.plan-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--plane);
+}
+
+.plan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+  font-size: var(--size-s);
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.seg button {
+  border: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--field);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.seg button:last-child {
+  border-right: 0;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--mdf);
+  color: var(--panel);
+}
+.seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.inline select {
+  padding: 2px 4px;
+}
+.inline.check {
+  cursor: pointer;
+}
+.inline.check input {
+  accent-color: var(--mdf);
+  margin: 0;
+}
+.inline.standalone {
+  align-self: end;
+  padding-bottom: 4px;
+  font-size: var(--size-s);
+}
+
+.plan-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.plan-canvas {
+  display: block;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.plan-canvas.tool-polygon,
+.plan-canvas.tool-rect,
+.plan-canvas.tool-circle {
+  cursor: crosshair;
+}
+.plan-canvas .grid-minor {
+  stroke: var(--grid-minor);
+  stroke-width: 1;
+  fill: none;
+}
+.plan-canvas .grid-major {
+  stroke: var(--grid-major);
+  stroke-width: 1;
+  fill: none;
+}
+.plan-canvas .axis {
+  stroke: var(--axis);
+  stroke-width: 1.25;
+}
+
+.plan-text {
+  font-family: var(--font-num);
+  font-size: 12px;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--plane);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.plan-text.ruler {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.plan-text.axis-label {
+  fill: var(--muted);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+.plan-text.strong {
+  font-weight: 600;
+  fill: var(--mdf);
+}
+.plan-text.edge {
+  font-size: 11px;
+  fill: var(--mdf);
+}
+
+.plan-el {
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  cursor: pointer;
+}
+.plan-el.plate {
+  fill: var(--plate-fill);
+}
+.plan-el.wing {
+  fill: var(--wing-fill);
+}
+.plan-el.hole {
+  fill: url(#plan-hatch);
+  stroke-dasharray: 5 3;
+}
+.hatch-line {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.plan-el.mirrored {
+  stroke-dasharray: 6 4;
+  opacity: 0.7;
+}
+.plan-el.selected {
+  stroke: var(--mdf);
+  stroke-width: 2.25;
+}
+.plan-el.invalid {
+  stroke: var(--bad);
+  stroke-width: 2;
+}
+.plan-el.rotor .rotor-fill {
+  fill: var(--rotor-fill);
+  stroke: var(--rotor);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+.plan-el.rotor .rotor-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+}
+.plan-el.rotor .rotor-axis {
+  stroke: var(--rotor);
+  stroke-width: 1;
+  pointer-events: none;
+}
+.plan-el.rotor.selected .rotor-fill {
+  stroke: var(--mdf);
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.plan-el.rotor.invalid .rotor-fill {
+  stroke: var(--bad);
+  stroke-width: 2;
+}
+
+.plan-dim line,
+.plan-dim .ext {
+  stroke: var(--muted);
+  stroke-width: 1;
+  fill: none;
+}
+.plan-canvas .arrow {
+  fill: var(--muted);
+}
+
+.plan-selection .handle {
+  fill: var(--panel);
+  stroke: var(--mdf);
+  stroke-width: 1.5;
+  cursor: move;
+}
+.plan-selection .handle.active {
+  fill: var(--mdf);
+}
+.plan-selection .mid-handle {
+  fill: var(--mdf);
+  opacity: 0.55;
+  cursor: copy;
+}
+.plan-selection .mid-handle:hover {
+  opacity: 1;
+}
+.plan-selection .radius-line {
+  stroke: var(--mdf);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.plan-draft polyline,
+.plan-draft polygon,
+.plan-draft circle,
+.plan-draft line {
+  fill: var(--mdf-soft);
+  stroke: var(--mdf);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.plan-draft polyline {
+  fill: none;
+}
+.plan-draft .mirror {
+  fill: none;
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+.plan-draft rect {
+  fill: var(--panel);
+  stroke: var(--mdf);
+  stroke-width: 1.5;
+}
+.plan-draft rect.close {
+  fill: var(--mdf);
+}
+
+.plan-cursor {
+  fill: none;
+  stroke: var(--mdf);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.plan-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  align-items: baseline;
+  padding: 4px 10px 6px;
+  border-top: 1px solid var(--rule);
+  background: var(--panel);
+  font-size: var(--size-s);
+  color: var(--muted);
+  min-height: 48px;
+}
+.plan-status .num {
+  color: var(--ink);
+  min-width: 18ch;
+}
+.plan-status .snap {
+  color: var(--mdf);
+}
+.plan-status .hint-text {
+  flex-basis: 100%;
+}
+
+.plan-empty {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 34ch;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
 /* ---------- viewer ---------- */
 
 .viewer {
   position: relative;
   background: var(--viewport);
   min-height: 0;
+}
+
+.viewer-tools {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-size: var(--size-s);
+  pointer-events: none;
+}
+.viewer-tools > * {
+  pointer-events: auto;
+}
+.viewer-tools .inline {
+  background: color-mix(in srgb, var(--viewport) 80%, transparent);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.export-buttons.compact {
+  display: inline-flex;
+  gap: 6px;
+}
+.export-buttons {
+  margin-top: 10px;
+}
+.export-buttons.compact {
+  margin-top: 0;
 }
 
 .label-layer {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "./state/store.ts";
 import { startPhysicsWorker } from "./worker/client.ts";
-import { ComponentList } from "./ui/ComponentList.tsx";
+import { LeftPanel } from "./ui/LeftPanel.tsx";
+import { PlanformProperties } from "./ui/planform/PlanformProperties.tsx";
 import { PropertiesPanel } from "./ui/PropertiesPanel.tsx";
 import { ResultsPanel } from "./ui/ResultsPanel.tsx";
 import { TopBar } from "./ui/TopBar.tsx";
-import { Viewer3D } from "./ui/Viewer3D.tsx";
+import { Workspace } from "./ui/Workspace.tsx";
 
 function useEffectiveTheme(): "light" | "dark" {
   const choice = useAppStore((s) => s.theme);
@@ -28,13 +29,14 @@ function useEffectiveTheme(): "light" | "dark" {
 
 export function App() {
   const theme = useEffectiveTheme();
+  const panel = useAppStore((s) => s.panel);
   useEffect(() => startPhysicsWorker(), []);
   return (
     <div className="app">
       <TopBar />
-      <ComponentList />
-      <Viewer3D theme={theme} />
-      <PropertiesPanel />
+      <LeftPanel />
+      <Workspace theme={theme} />
+      {panel === "planform" ? <PlanformProperties /> : <PropertiesPanel />}
       <ResultsPanel />
     </div>
   );

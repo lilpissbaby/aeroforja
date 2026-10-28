@@ -11,9 +11,13 @@ import {
   toMillimeters,
 } from "../units/display.ts";
 import type { Outcome } from "../worker/protocol.ts";
-import { MethodDetails, ProvenanceTag, ResultHead, ValidityBadge } from "./ResultMeta.tsx";
+import type { PlanformIssue } from "../planform/geometry.ts";
+import { mm1 } from "../planform/view.ts";
+import { ExportButtons } from "./planform/ExportButtons.tsx";
+import { usePlanformAnalysis } from "./planform/usePlanformAnalysis.ts";
+import { IssueBadge, MethodDetails, ProvenanceTag, ResultHead, ValidityBadge } from "./ResultMeta.tsx";
 
-type Tab = "mass" | "inertia" | "air" | "warnings";
+type Tab = "plan" | "mass" | "inertia" | "air" | "warnings";
 
 function Value({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
@@ -150,6 +154,101 @@ function AirTab() {
   );
 }
 
+
+function PlanTab() {
+  const a = usePlanformAnalysis();
+  const select = useAppStore((s) => s.selectPlanElement);
+  if (a.bounds === null) {
+    return <p className="hint">La planta está vacía: dibuja en el plano o usa una plantilla del panel izquierdo.</p>;
+  }
+  const b = a.bounds;
+  const cm2 = (m2: number) => formatFixed(m2 * 1e4, 1);
+  return (
+    <>
+      <div className="result-head">
+        <ProvenanceTag provenance="CALCULATED" />
+        <span className="hint">Solo geometría: sin masas ni aerodinámica.</span>
+      </div>
+      <div className="columns">
+        <dl className="values">
+          <Value label="Envergadura (y)" value={mm1(b.maxY - b.minY)} unit="mm" />
+          <Value label="Longitud (x)" value={mm1(b.maxX - b.minX)} unit="mm" />
+          <Value label="Área en planta" value={cm2(a.projectedArea)} unit="cm²" />
+          <Value label="Volumen de piezas" value={formatFixed(a.volume * 1e6, 2)} unit="cm³" />
+        </dl>
+        {a.wing !== null && (
+          <dl className="values">
+            <Value label="Superficie alar S" value={formatFixed(a.wing.area * 100, 2)} unit="dm²" />
+            <Value label="Envergadura alar b" value={mm1(a.wing.span)} unit="mm" />
+            <Value label="Alargamiento b²/S" value={formatFixed(a.wing.aspectRatio, 2)} unit="" />
+            <Value label="Cuerda media S/b" value={mm1(a.wing.meanChord)} unit="mm" />
+          </dl>
+        )}
+        {a.rotorSummary !== null && (
+          <dl className="values">
+            <Value label="Hélices" value={String(a.rotorSummary.count)} unit="" />
+            <Value label="Área de discos" value={formatFixed(a.rotorSummary.discArea * 100, 2)} unit="dm²" />
+            <Value label="Máx. entre ejes" value={mm1(a.rotorSummary.maxAxisDistance)} unit="mm" />
+          </dl>
+        )}
+        <dl className="values">
+          {a.layers.map((l, i) => (
+            <Value
+              key={l.key}
+              label={`Capa ${i + 1}: z ${mm1(l.z)}, ${mm1(l.thickness)} mm`}
+              value={`${cm2(l.area)} cm² · ${l.bodies.length} ${l.bodies.length === 1 ? "pieza" : "piezas"}`}
+              unit=""
+            />
+          ))}
+        </dl>
+      </div>
+      {a.issues.length > 0 && (
+        <ul className="warnings plan-issues">
+          {a.issues.map((issue, i) => (
+            <li key={i}>
+              <IssueBadge level={issue.level} />
+              {issue.elementId !== undefined ? (
+                <button type="button" className="link" onClick={() => select(issue.elementId ?? null)}>
+                  {issue.message}
+                </button>
+              ) : (
+                <span>{issue.message}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ExportButtons />
+      <details className="method">
+        <summary>Método, referencias y supuestos</summary>
+        <ul>
+          <li>
+            Áreas y centroides por la fórmula del área de Gauss (shoelace).
+          </li>
+          <li>
+            Uniones y vaciados por operaciones booleanas de polígonos: algoritmo de barrido de Martínez, Rueda y Feito
+            <span className="ref">
+              F. Martínez, A. J. Rueda, F. R. Feito (2009). A new algorithm for computing Boolean operations on polygons.
+              Computers &amp; Geosciences 35(6), 1177–1185 (implementación: librería polygon-clipping).
+            </span>
+          </li>
+          <li>
+            Alargamiento A = b²/S y cuerda media geométrica S/b, por definición
+            <span className="ref">J. D. Anderson, Fundamentals of Aerodynamics, cap. 5.</span>
+          </li>
+        </ul>
+        <ul>
+          <li>Piezas planas de espesor uniforme: cada una es la extrusión de su contorno en planta.</li>
+          <li>Los círculos se discretizan en polígonos inscritos con un error de cuerda de 0,01 mm como máximo.</li>
+          <li>Los discos de hélice son planos sin espesor: el aviso de choque solo mira si el plano corta una pieza.</li>
+          <li>La superficie alar no descuenta los vaciados (se suponen entelados).</li>
+          <li>Las coordenadas generadas se redondean a la micra.</li>
+        </ul>
+      </details>
+    </>
+  );
+}
+
 interface Warning {
   readonly source: string;
   readonly check?: ValidityCheck;
@@ -169,10 +268,18 @@ function collectWarnings(results: ReturnType<typeof useAppStore.getState>["resul
   return out;
 }
 
-function WarningsTab({ warnings }: { warnings: Warning[] }) {
-  if (warnings.length === 0) return <p className="hint">Todo lo calculado está dentro del rango validado.</p>;
+function WarningsTab({ warnings, planIssues }: { warnings: Warning[]; planIssues: readonly PlanformIssue[] }) {
+  if (warnings.length === 0 && planIssues.length === 0) {
+    return <p className="hint">Todo lo calculado está dentro del rango validado y la planta no tiene problemas.</p>;
+  }
   return (
     <ul className="warnings">
+      {planIssues.map((issue, i) => (
+        <li key={`plan${i}`}>
+          <IssueBadge level={issue.level} />
+          <span>Planta: {issue.message}</span>
+        </li>
+      ))}
       {warnings.map((w, i) => {
         if (w.check === undefined) {
           return (
@@ -201,14 +308,17 @@ function WarningsTab({ warnings }: { warnings: Warning[] }) {
 }
 
 export function ResultsPanel() {
-  const [tab, setTab] = useState<Tab>("mass");
+  const [tab, setTab] = useState<Tab>("plan");
   const results = useAppStore((s) => s.results);
+  const planIssues = usePlanformAnalysis().issues;
   const warnings = collectWarnings(results);
+  const count = warnings.length + planIssues.length;
   const tabs: readonly [Tab, string][] = [
+    ["plan", "Planta"],
     ["mass", "Masa y CG"],
     ["inertia", "Inercia"],
     ["air", "Aire"],
-    ["warnings", warnings.length === 0 ? "Avisos" : `Avisos (${warnings.length})`],
+    ["warnings", count === 0 ? "Avisos" : `Avisos (${count})`],
   ];
   return (
     <section className="bottom" aria-label="Resultados">
@@ -220,10 +330,11 @@ export function ResultsPanel() {
         ))}
       </div>
       <div className="tab-body" role="tabpanel">
+        {tab === "plan" && <PlanTab />}
         {tab === "mass" && <MassTab />}
         {tab === "inertia" && <InertiaTab />}
         {tab === "air" && <AirTab />}
-        {tab === "warnings" && <WarningsTab warnings={warnings} />}
+        {tab === "warnings" && <WarningsTab warnings={warnings} planIssues={planIssues} />}
       </div>
     </section>
   );

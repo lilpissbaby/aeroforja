@@ -14,6 +14,18 @@ export function ValidityBadge({ level }: { readonly level: ValidityLevel }) {
   );
 }
 
+/** Problems found in the drawing: not a validity range, so they read "Error" or "Aviso". */
+export function IssueBadge({ level }: { readonly level: "red" | "amber" }) {
+  return (
+    <span className={`validity ${level}`}>
+      <span className="dot" aria-hidden="true">
+        {ICON[level]}
+      </span>
+      {level === "red" ? "Error" : "Aviso"}
+    </span>
+  );
+}
+
 export function ProvenanceTag({ provenance }: { readonly provenance: Provenance }) {
   return <span className={`tag ${provenance.toLowerCase()}`}>{PROVENANCE_ES[provenance]}</span>;
 }

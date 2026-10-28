@@ -15,6 +15,11 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 | 2026-10-27 | Interfaz en español; código, identificadores y comentarios en inglés | Claude | Como pide el proyecto |
 | 2026-10-27 | Datos brutos de terceros (base UIUC) en `data/raw/`, fuera de git | Claude | Hasta aclarar si se pueden redistribuir; la web solo pide citarla |
 | 2026-10-27 | Commits en el repo local los hace Claude; el push lo hace mupsim | mupsim | Esta sesión no tiene credenciales de GitHub |
+| 2026-10-28 | Editor de planta 2D → modelo 3D adelantado a la PoC | mupsim | Parte del editor del MVP; solo geometría, sin masas ni aerodinámica. Ver `docs/design/003-planta-2d-a-3d.md` |
+| 2026-10-28 | Despliegue Docker en local y en el VPS adelantado (estaba en la v1) | mupsim | `docker/` y `docs/despliegue.md` |
+| 2026-10-28 | Operaciones booleanas de polígonos con polygon-clipping (MIT, Martínez-Rueda-Feito) | Claude | No cambia resultados físicos; evita escribir un recortador propio |
+| 2026-10-28 | La planta del 3D se extruye como placa plana del espesor indicado | Claude | Es la técnica «placa plana» del módulo de fabricación; perfiles reales en la v1 |
+| 2026-10-28 | En el VPS, `aeroforja.tenebrum.online` con basic auth por defecto | Claude | Mientras sigan abiertas la licencia y «uso personal o publicación» |
 
 ## Abiertas
 

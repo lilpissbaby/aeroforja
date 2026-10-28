@@ -1,0 +1,20 @@
+# AeroForja behind the reverse proxy of docker-modular-infra.
+# Same template as the other apps: joins the external proxy_network and only
+# exposes port 80 to it; the reverse_proxy container terminates TLS.
+#   docker compose -f docker/docker-compose.vps.yml up -d --build
+
+networks:
+  proxy_network:
+    external: true
+
+services:
+  aeroforja:
+    container_name: aeroforja
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: aeroforja:latest
+    restart: always
+    expose: ["80"]
+    networks:
+      - proxy_network

@@ -20,19 +20,35 @@ export function startPhysicsWorker(): () => void {
     worker.postMessage({ seq: latestSent, model, air });
   };
 
+  // Drags change the planform on every pointer move; storage is written once
+  // things settle.
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleSave = (): void => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveState(useAppStore.getState()), 300);
+  };
+  const flush = (): void => {
+    clearTimeout(saveTimer);
+    saveState(useAppStore.getState());
+  };
+  window.addEventListener("pagehide", flush);
+
   send();
   const unsubscribe = useAppStore.subscribe((state, previous) => {
     if (state.model !== previous.model || state.air !== previous.air) send();
     if (
       state.model !== previous.model ||
+      state.planform !== previous.planform ||
       state.projectName !== previous.projectName ||
       state.theme !== previous.theme
     ) {
-      saveState(state);
+      scheduleSave();
     }
   });
 
   return () => {
+    window.removeEventListener("pagehide", flush);
+    flush();
     unsubscribe();
     worker.terminate();
   };
