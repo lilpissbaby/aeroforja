@@ -28,6 +28,7 @@
   --wing-fill: #8fa6b066;
   --rotor: #3d6f8f;
   --rotor-fill: #3d6f8f14;
+  --tour-shade: rgba(16, 24, 27, 0.55);
 
   --font-ui: "Barlow", system-ui, sans-serif;
   --font-num: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
@@ -61,6 +62,7 @@
   --wing-fill: #8fa6b04d;
   --rotor: #7fb4d6;
   --rotor-fill: #7fb4d61a;
+  --tour-shade: rgba(4, 8, 10, 0.68);
   color-scheme: dark;
 }
 
@@ -226,8 +228,29 @@ select {
   align-self: center;
 }
 
-.theme-select {
+.topbar-end {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tour-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.tour-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mdf);
+  color: var(--panel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* ---------- fields ---------- */
@@ -339,6 +362,15 @@ select {
 }
 .button:hover {
   border-color: var(--muted);
+}
+.button.primary {
+  background: var(--mdf);
+  border-color: var(--mdf);
+  color: var(--panel);
+  font-weight: 600;
+}
+.button.primary:hover {
+  border-color: var(--ink);
 }
 .button.danger {
   color: var(--bad);
@@ -1058,6 +1090,149 @@ details.method .ref {
 }
 .label-3d.cg {
   font-weight: 700;
+}
+
+/* ---------- guided tour ---------- */
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 5px;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--field);
+  font-family: var(--font-num);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.tour-backdrop {
+  position: absolute;
+  inset: 0;
+}
+.tour-dim {
+  position: absolute;
+  inset: 0;
+  background: var(--tour-shade);
+  pointer-events: none;
+}
+.tour-spot {
+  position: absolute;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 2px var(--mdf),
+    0 0 0 200vmax var(--tour-shade);
+  pointer-events: none;
+  transition:
+    left 0.22s ease,
+    top 0.22s ease,
+    width 0.22s ease,
+    height 0.22s ease;
+}
+
+.tour-card {
+  position: absolute;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(10, 16, 18, 0.28);
+  padding: 0 18px 14px;
+  transition:
+    left 0.22s ease,
+    top 0.22s ease;
+}
+.tour[data-placement="dock"] .tour-card {
+  width: calc(100vw - 24px);
+  max-height: 55vh;
+}
+
+.tour-progress {
+  height: 3px;
+  margin: 0 -18px 12px;
+  background: var(--rule);
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+}
+.tour-progress span {
+  display: block;
+  height: 100%;
+  background: var(--mdf);
+  transition: width 0.22s ease;
+}
+.tour-count {
+  margin: 0;
+  font-size: var(--size-s);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.tour-card h2 {
+  margin: 2px 0 8px;
+  font-size: var(--size-l);
+  font-weight: 700;
+  text-wrap: balance;
+}
+.tour-body {
+  font-size: var(--size-m);
+  line-height: 1.5;
+}
+.tour-body p {
+  margin: 0 0 8px;
+}
+.tour-body ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+}
+.tour-keys {
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: var(--size-s);
+}
+.tour-keys td {
+  padding: 4px 10px 4px 0;
+  vertical-align: top;
+}
+.tour-keys td:first-child {
+  white-space: nowrap;
+}
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tour-actions .spacer {
+  flex: 1;
+}
+.tour-skip {
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  font-size: var(--size-s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot,
+  .tour-card,
+  .tour-progress span {
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

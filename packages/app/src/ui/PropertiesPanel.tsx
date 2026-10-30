@@ -176,7 +176,7 @@ export function PropertiesPanel() {
 
   if (component === undefined) {
     return (
-      <aside className="right" aria-label="Propiedades">
+      <aside className="right" aria-label="Propiedades" data-tour="properties">
         <section className="panel-section">
           <h2>Propiedades</h2>
           <p className="hint">Elige una pieza en la lista o haz clic sobre ella en el visor.</p>
@@ -232,7 +232,7 @@ export function PropertiesPanel() {
   };
 
   return (
-    <aside className="right" aria-label="Propiedades">
+    <aside className="right" aria-label="Propiedades" data-tour="properties">
       <section className="panel-section">
         <h2>Propiedades</h2>
         <div className="field">

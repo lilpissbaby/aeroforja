@@ -37,10 +37,14 @@ function ElementList() {
   const invalid = new Set(analysis.issues.filter((i) => i.level === "red").map((i) => i.elementId));
 
   if (planform.elements.length === 0) {
-    return <p className="hint panel-section">Aún no hay elementos. Dibuja en el plano o usa una plantilla.</p>;
+    return (
+      <p className="hint panel-section" data-tour="plan-list">
+        Aún no hay elementos. Dibuja en el plano o usa una plantilla.
+      </p>
+    );
   }
   return (
-    <ul className="component-list">
+    <ul className="component-list" data-tour="plan-list">
       {planform.elements.map((e) => (
         <li key={e.id}>
           <button type="button" aria-current={e.id === selectedId} onClick={() => select(e.id === selectedId ? null : e.id)}>
@@ -283,7 +287,7 @@ export function PlanformPanel() {
         </div>
       </section>
       <ElementList />
-      <section className="panel-section">
+      <section className="panel-section" data-tour="templates">
         <h3>Plantillas</h3>
         <FrameTemplate />
         <WingTemplate />

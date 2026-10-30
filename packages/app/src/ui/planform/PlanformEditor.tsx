@@ -513,7 +513,8 @@ export function PlanformEditor() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (useAppStore.getState().panel !== "planform") return;
+      // The guided tour owns the keyboard while it is open.
+      if (useAppStore.getState().panel !== "planform" || useAppStore.getState().tourStep !== null) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable='true']") != null) return;
       const store = useAppStore.getState();
@@ -672,15 +673,16 @@ export function PlanformEditor() {
     const b = analysis.bounds;
     if (b === null || draft.length > 0 || preview !== null) return null;
     const leftFront = project(cam, [b.maxX, b.minY]);
-    const rightFront = project(cam, [b.maxX, b.maxY]);
     const leftRear = project(cam, [b.minX, b.minY]);
-    const yLine = leftFront[1] - 26;
+    const rightRear = project(cam, [b.minX, b.maxY]);
+    // Span below the tail, so it never sits on the "x · adelante" axis label at the top.
+    const yLine = leftRear[1] + 26;
     const xLine = leftFront[0] - 26;
     return (
       <g className="plan-dim" aria-hidden="true">
-        <path d={`M${r1(leftFront[0])} ${r1(leftFront[1] - 4)}V${r1(yLine - 6)}M${r1(rightFront[0])} ${r1(rightFront[1] - 4)}V${r1(yLine - 6)}`} className="ext" />
-        <line x1={r1(leftFront[0])} y1={r1(yLine)} x2={r1(rightFront[0])} y2={r1(yLine)} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
-        <text x={r1((leftFront[0] + rightFront[0]) / 2)} y={r1(yLine - 6)} textAnchor="middle" className="plan-text">
+        <path d={`M${r1(leftRear[0])} ${r1(leftRear[1] + 4)}V${r1(yLine + 6)}M${r1(rightRear[0])} ${r1(rightRear[1] + 4)}V${r1(yLine + 6)}`} className="ext" />
+        <line x1={r1(leftRear[0])} y1={r1(yLine)} x2={r1(rightRear[0])} y2={r1(yLine)} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
+        <text x={r1((leftRear[0] + rightRear[0]) / 2)} y={r1(yLine + 16)} textAnchor="middle" className="plan-text">
           {`Envergadura ${mm1(b.maxY - b.minY)} mm`}
         </text>
         <path d={`M${r1(leftFront[0] - 4)} ${r1(leftFront[1])}H${r1(xLine - 6)}M${r1(leftRear[0] - 4)} ${r1(leftRear[1])}H${r1(xLine - 6)}`} className="ext" />
@@ -825,7 +827,7 @@ export function PlanformEditor() {
 
   return (
     <div className="plan-editor">
-      <div className="plan-toolbar" role="toolbar" aria-label="Herramientas de la planta">
+      <div className="plan-toolbar" role="toolbar" aria-label="Herramientas de la planta" data-tour="plan-toolbar">
         <div className="seg" role="group" aria-label="Herramienta">
           {TOOL_LABELS.map(([id, label, key]) => (
             <button key={id} type="button" aria-pressed={tool === id} onClick={() => setTool(id)} title={`${label} (${key})`}>
@@ -878,7 +880,7 @@ export function PlanformEditor() {
         </div>
       </div>
 
-      <div className="plan-canvas-wrap" ref={wrapRef}>
+      <div className="plan-canvas-wrap" ref={wrapRef} data-tour="plan-canvas">
         <svg
           ref={svgRef}
           className={`plan-canvas tool-${tool}`}
@@ -944,7 +946,7 @@ export function PlanformEditor() {
           </p>
         )}
       </div>
-      <div className="plan-status">
+      <div className="plan-status" data-tour="plan-status">
         <span className="num">
           {cursor === null ? "x — · y —" : `x ${mm1(cursor.point[0])} mm · y ${mm1(cursor.point[1])} mm`}
         </span>

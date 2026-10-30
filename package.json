@@ -16,6 +16,8 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --no-bail typecheck",
     "check": "pnpm typecheck && pnpm test",
+    "docs:capture": "node scripts/capture-docs.cjs",
+    "docs:optimize": "python3 scripts/optimize-docs-images.py",
     "docker:local": "docker compose -f docker/docker-compose.local.yml up -d --build",
     "docker:local:down": "docker compose -f docker/docker-compose.local.yml down",
     "isa": "node --disable-warning=ExperimentalWarning examples/isa.ts",

@@ -236,8 +236,9 @@ export function elementProblem(element: PlanformElement): ElementProblem {
   } else {
     if (element.points.length < 3) return { level: "red", message: "Un contorno necesita al menos 3 vértices." };
     const ring = elementRing(element);
-    if (ringArea(ring) < MIN_AREA) return { level: "red", message: "El contorno no encierra superficie (menos de 1 mm²)." };
+    // Crossing first: the two loops of a crossed contour cancel in the signed area.
     if (selfIntersects(ring)) return { level: "red", message: "El contorno se corta a sí mismo; mueve los vértices para deshacer el cruce." };
+    if (ringArea(ring) < MIN_AREA) return { level: "red", message: "El contorno no encierra superficie (menos de 1 mm²)." };
   }
   if ((element.role === "plate" || element.role === "wing") && !(element.thickness > 0)) {
     return { level: "red", message: "El espesor tiene que ser mayor que cero." };

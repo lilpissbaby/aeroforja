@@ -10,7 +10,7 @@ export function ExportButtons({ compact = false }: { compact?: boolean }) {
   const empty = analysis.layers.length === 0;
   const base = fileSafe(projectName);
   return (
-    <div className={compact ? "export-buttons compact" : "export-buttons row"}>
+    <div className={compact ? "export-buttons compact" : "export-buttons row"} data-tour="exports">
       <button
         type="button"
         className="button"

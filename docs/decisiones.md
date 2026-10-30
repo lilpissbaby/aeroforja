@@ -20,6 +20,10 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 | 2026-10-28 | Operaciones booleanas de polígonos con polygon-clipping (MIT, Martínez-Rueda-Feito) | Claude | No cambia resultados físicos; evita escribir un recortador propio |
 | 2026-10-28 | La planta del 3D se extruye como placa plana del espesor indicado | Claude | Es la técnica «placa plana» del módulo de fabricación; perfiles reales en la v1 |
 | 2026-10-28 | En el VPS, `aeroforja.tenebrum.online` con basic auth por defecto | Claude | Mientras sigan abiertas la licencia y «uso personal o publicación» |
+| 2026-10-30 | Tour guiado propio dentro de la app (sin librería), que se abre solo la primera vez | mupsim pidió el tour; la implementación, Claude | 22 pasos; no toca el diseño y restaura vista, panel y selección al cerrar |
+| 2026-10-30 | README como guía ilustrada, con capturas generadas por `scripts/capture-docs.cjs` (Playwright) | mupsim pidió la guía; el método, Claude | Las imágenes se rehacen con la app real; unos 9 MB en `docs/img/` |
+| 2026-10-30 | El visor 3D dibuja bajo demanda, no en cada fotograma | Claude | Sin coste de GPU ni batería con la app quieta; no cambia resultados |
+| 2026-10-30 | El 3D se reencuadra solo al cambiar de vista y cuando el dibujo cambia de tamaño más de ×2 | Claude | Encuadre según el campo de visión más estrecho del panel |
 
 ## Abiertas
 

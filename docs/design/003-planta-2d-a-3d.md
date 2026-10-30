@@ -35,7 +35,7 @@ Cada elemento puede ser simétrico: se añade su reflejo en y → −y.
 
 ## Comprobaciones que hace la app
 
-- Contornos con menos de 3 vértices, sin área (< 1 mm²) o que se cortan a sí mismos: error en rojo y fuera del 3D.
+- Contornos con menos de 3 vértices, que se cortan a sí mismos o sin área (< 1 mm²): error en rojo y fuera del 3D. El cruce se comprueba antes que el área, porque los dos lazos de un contorno cruzado se cancelan en el área con signo y parecería vacío.
 - Dos discos de hélice que se solapan en el mismo plano: error en rojo (las palas chocarían). A distinta altura: aviso ámbar, porque el disco no tiene espesor y la interferencia entre hélices no está modelada.
 - Un disco que atraviesa una plancha: error en rojo (la hélice golpearía la estructura).
 - Un vaciado que no recorta nada: aviso.

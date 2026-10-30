@@ -156,7 +156,8 @@ export function fitCamera(
   if (box === null || w <= 0 || h <= 0) return { cx: 0, cy: 0, scale: w > 0 && h > 0 ? Math.min(w, h) / 400 : 1.5, w, h };
   const width = Math.max((box.maxY - box.minY) * 1000, 20);
   const height = Math.max((box.maxX - box.minX) * 1000, 20);
-  const scale = Math.min((w * 0.8) / width, (h * 0.75) / height);
+  // Room around the drawing for the overall dimensions and the rulers.
+  const scale = Math.min((w * 0.72) / width, (h * 0.7) / height);
   return {
     cx: ((box.minY + box.maxY) / 2) * 1000,
     cy: (-(box.minX + box.maxX) / 2) * 1000,

@@ -321,7 +321,7 @@ export function ResultsPanel() {
     ["warnings", count === 0 ? "Avisos" : `Avisos (${count})`],
   ];
   return (
-    <section className="bottom" aria-label="Resultados">
+    <section className="bottom" aria-label="Resultados" data-tour="results">
       <div className="tabs" role="tablist">
         {tabs.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>

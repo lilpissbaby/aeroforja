@@ -7,6 +7,7 @@ import { PropertiesPanel } from "./ui/PropertiesPanel.tsx";
 import { ResultsPanel } from "./ui/ResultsPanel.tsx";
 import { TopBar } from "./ui/TopBar.tsx";
 import { Workspace } from "./ui/Workspace.tsx";
+import { Tour, tourSeen } from "./ui/tour/Tour.tsx";
 
 function useEffectiveTheme(): "light" | "dark" {
   const choice = useAppStore((s) => s.theme);
@@ -31,6 +32,10 @@ export function App() {
   const theme = useEffectiveTheme();
   const panel = useAppStore((s) => s.panel);
   useEffect(() => startPhysicsWorker(), []);
+  // First visit: the guided tour opens by itself once.
+  useEffect(() => {
+    if (!tourSeen()) useAppStore.getState().startTour();
+  }, []);
   return (
     <div className="app">
       <TopBar />
@@ -38,6 +43,7 @@ export function App() {
       <Workspace theme={theme} />
       {panel === "planform" ? <PlanformProperties /> : <PropertiesPanel />}
       <ResultsPanel />
+      <Tour />
     </div>
   );
 }

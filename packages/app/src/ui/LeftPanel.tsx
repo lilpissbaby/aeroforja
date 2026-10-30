@@ -30,7 +30,7 @@ function ProjectFiles() {
   };
 
   return (
-    <section className="panel-section">
+    <section className="panel-section" data-tour="project-files">
       <h3>Proyecto</h3>
       <div className="row">
         <button type="button" className="button" onClick={() => fileInput.current?.click()}>
@@ -79,7 +79,7 @@ export function LeftPanel() {
   const setPanel = useAppStore((s) => s.setPanel);
   return (
     <aside className="left" aria-label="Diseño">
-      <div className="tabs" role="tablist" aria-label="Qué editar">
+      <div className="tabs" role="tablist" aria-label="Qué editar" data-tour="left-tabs">
         {TABS.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={panel === id} onClick={() => setPanel(id)}>
             {label}

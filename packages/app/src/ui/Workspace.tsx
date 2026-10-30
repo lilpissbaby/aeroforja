@@ -14,7 +14,7 @@ export function Workspace({ theme }: { theme: "light" | "dark" }) {
   const setView = useAppStore((s) => s.setView);
   return (
     <main className={`workspace view-${view}`}>
-      <div className="view-switch" role="tablist" aria-label="Vistas">
+      <div className="view-switch" role="tablist" aria-label="Vistas" data-tour="view-switch">
         {VIEWS.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}>
             {label}

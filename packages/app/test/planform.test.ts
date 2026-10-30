@@ -160,6 +160,9 @@ describe("planform analysis", () => {
     const a = analysePlanform({ elements: [bow, tiny] });
     expect(a.layers).toHaveLength(0);
     expect(a.issues.filter((i) => i.level === "red")).toHaveLength(2);
+    // A crossed contour has zero signed area; it must be reported as crossed, not as empty.
+    expect(a.issues.find((i) => i.elementId === "lazo")?.message).toMatch(/se corta a sí mismo/);
+    expect(a.issues.find((i) => i.elementId === "punto")?.message).toMatch(/no encierra superficie/);
   });
 
   it("finds which drawn element covers a point of a sheet", () => {

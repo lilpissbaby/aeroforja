@@ -25,7 +25,7 @@ export function ComponentList() {
         </div>
       </section>
 
-      <ul className="component-list">
+      <ul className="component-list" data-tour="mass-list">
         {model.components.map((c) => (
           <li key={c.id}>
             <button

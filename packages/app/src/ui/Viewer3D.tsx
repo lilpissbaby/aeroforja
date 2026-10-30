@@ -284,17 +284,36 @@ function contentOf(
 
 /**
  * Places the camera so everything shown fills the view, looking from
- * front-right and above. It reads the latest state when asked, not the
- * deferred analysis, so a template applied a moment ago is framed whole.
+ * front-right and above. It frames again when asked (Encuadrar, a template,
+ * an opened file), when the view changes between «Planta + 3D» and «3D»
+ * (once the canvas has its new size), and when the drawing grows or shrinks
+ * by more than half, as when the first contour appears. Small edits and
+ * window resizes leave the camera where the person put it.
  */
-function FitCamera({ token }: { token: number }) {
+function FitCamera({ token, radius }: { token: string; radius: number }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update(): void } | null;
+  const invalidate = useThree((s) => s.invalidate);
+  const size = useThree((s) => s.size);
+  const last = useRef<{ token: string; radius: number; at: number } | null>(null);
   useEffect(() => {
+    const now = performance.now();
+    const previous = last.current;
+    const asked = previous === null || previous.token !== token;
+    // The canvas takes its new size a moment after the view changes.
+    const settling = previous !== null && now - previous.at < 800;
+    const rescaled = previous !== null && (radius > previous.radius * 2 || radius < previous.radius / 2);
+    if (!asked && !settling && !rescaled) return;
+
+    // Latest state, not the deferred analysis: a template applied a moment ago is framed whole.
     const state = useAppStore.getState();
     const { center: c, radius: r } = contentOf(state.model.components, analysisFor(state.planform), state.show3d);
     const direction = new THREE.Vector3(0.8, 0.65, 1.0).normalize();
-    const distance = (r / Math.sin(((camera.fov ?? 40) * Math.PI) / 360)) * 1.05;
+    // The sphere must fit the narrower of the two fields of view: in a tall
+    // pane (split view) that is the horizontal one.
+    const halfV = ((camera.fov ?? 40) * Math.PI) / 360;
+    const halfH = Math.atan(Math.tan(halfV) * (camera.aspect || 1));
+    const distance = (r / Math.sin(Math.min(halfV, halfH))) * 1.05;
     camera.position.set(c[0] + direction.x * distance, c[1] + direction.y * distance, c[2] + direction.z * distance);
     camera.near = Math.max(distance / 500, 1e-4);
     camera.far = distance * 50;
@@ -303,7 +322,9 @@ function FitCamera({ token }: { token: number }) {
       controls.target.set(c[0], c[1], c[2]);
       controls.update();
     }
-  }, [token, controls, camera]);
+    invalidate();
+    last.current = { token, radius: r, at: asked ? now : (previous?.at ?? now) };
+  }, [token, radius, size.width, size.height, controls, camera, invalidate]);
   return null;
 }
 
@@ -319,6 +340,7 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
   const show = useAppStore((s) => s.show3d);
   const setShow = useAppStore((s) => s.setShow3d);
   const fitRequest = useAppStore((s) => s.fitRequest);
+  const viewMode = useAppStore((s) => s.view);
   const analysis = usePlanformAnalysis();
   const labelLayer = useRef<HTMLDivElement>(null);
   const [localFit, setLocalFit] = useState(0);
@@ -343,11 +365,14 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
       });
 
   return (
-    <div className="viewer">
+    <div className="viewer" data-tour="viewer">
       <LabelLayer.Provider value={labelLayer}>
       <Canvas
         camera={{ position: [0.3, 0.25, 0.4], fov: 40, near: 0.002, far: 50 }}
         gl={{ alpha: true, antialias: true }}
+        // Draw only when something changes (an edit, the camera moving), not
+        // 60 times a second: an idle workbench costs no GPU or battery.
+        frameloop="demand"
         onPointerMissed={() => {
           select(null);
           selectPlanElement(null);
@@ -388,11 +413,11 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
         ))}
         {show.mass && mass !== null && <CgMarker position={cg} radius={Math.max(0.006, extent * 0.045)} palette={palette} />}
         <OrbitControls makeDefault enableDamping={false} />
-        <FitCamera token={fitRequest * 1000 + localFit} />
+        <FitCamera token={`${fitRequest}:${localFit}:${viewMode}`} radius={content.radius} />
       </Canvas>
       </LabelLayer.Provider>
       <div className="label-layer" ref={labelLayer} />
-      <div className="viewer-tools">
+      <div className="viewer-tools" data-tour="viewer-tools">
         <label className="inline check">
           <input type="checkbox" checked={show.planform} onChange={(e) => setShow({ planform: e.target.checked })} />
           <span>Planta en 3D</span>

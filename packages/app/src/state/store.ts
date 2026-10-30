@@ -39,6 +39,8 @@ export interface AppState {
   readonly show3d: { readonly planform: boolean; readonly mass: boolean };
   /** Incremented to ask the 2D and 3D views to frame the whole drawing. */
   readonly fitRequest: number;
+  /** Step of the guided tour on screen, or null when the tour is closed. */
+  readonly tourStep: number | null;
 
   select(id: string | null): void;
   updateComponent(id: string, update: (c: MassComponent) => MassComponent): void;
@@ -70,6 +72,9 @@ export interface AppState {
   setView(view: ViewMode): void;
   setShow3d(patch: Partial<AppState["show3d"]>): void;
   requestFit(): void;
+  startTour(): void;
+  setTourStep(step: number): void;
+  endTour(): void;
 }
 
 const STORAGE_KEY = "aeroforja.workbench.v1";
@@ -165,6 +170,7 @@ export const useAppStore = create<AppState>()((set) => ({
   // The planform is what the workbench opens on; the mass pieces and CG are one click away.
   show3d: { planform: true, mass: false },
   fitRequest: 0,
+  tourStep: null,
 
   select: (id) => set(id === null ? { selectedId: null } : { selectedId: id, planSelectedId: null, panel: "mass" }),
 
@@ -313,4 +319,7 @@ export const useAppStore = create<AppState>()((set) => ({
   setView: (view) => set({ view }),
   setShow3d: (patch) => set((s) => ({ show3d: { ...s.show3d, ...patch } })),
   requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+  startTour: () => set({ tourStep: 0 }),
+  setTourStep: (step) => set({ tourStep: step }),
+  endTour: () => set({ tourStep: null }),
 }));

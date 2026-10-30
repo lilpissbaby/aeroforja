@@ -72,7 +72,7 @@ function Geometry({ element }: { element: PlanformElement }) {
   const copies = element.mirror && !(element.shape === "circle" && Math.abs(element.center.y) < 1e-6) ? 2 : 1;
   const area = elementArea(element);
   return (
-    <section className="panel-section">
+    <section className="panel-section" data-tour="geometry">
       <h3>
         Geometría <ProvenanceTag provenance="CALCULATED" />
       </h3>
@@ -103,7 +103,7 @@ function Vertices({ element }: { element: Extract<PlanformElement, { shape: "pol
         : e,
     );
   return (
-    <section className="panel-section">
+    <section className="panel-section" data-tour="vertices">
       <h3>Vértices</h3>
       <table className="vertex-table">
         <thead>
@@ -160,7 +160,7 @@ export function PlanformProperties() {
 
   if (element === undefined) {
     return (
-      <aside className="right" aria-label="Propiedades">
+      <aside className="right" aria-label="Propiedades" data-tour="properties">
         <section className="panel-section">
           <h2>Propiedades</h2>
           <p className="hint">
@@ -195,7 +195,7 @@ export function PlanformProperties() {
   const roles = element.shape === "circle" ? ROLES : ROLES.filter((r) => r !== "rotor");
 
   return (
-    <aside className="right" aria-label="Propiedades">
+    <aside className="right" aria-label="Propiedades" data-tour="properties">
       <section className="panel-section">
         <h2>Propiedades</h2>
         <NameField value={element.name} onCommit={(name) => set((e) => ({ ...e, name }))} />

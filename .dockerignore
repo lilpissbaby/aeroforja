@@ -4,3 +4,4 @@ coverage
 data/raw
 .git
 *.log
+docs/img

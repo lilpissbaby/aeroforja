@@ -8,10 +8,11 @@ export function TopBar() {
   const setAir = useAppStore((s) => s.setAir);
   const setTheme = useAppStore((s) => s.setTheme);
   const setProjectName = useAppStore((s) => s.setProjectName);
+  const startTour = useAppStore((s) => s.startTour);
 
   return (
     <header className="topbar">
-      <div className="brand">
+      <div className="brand" data-tour="project">
         <span className="wordmark">
           Aero<b>Forja</b>
         </span>
@@ -24,7 +25,7 @@ export function TopBar() {
         />
       </div>
 
-      <fieldset className="air">
+      <fieldset className="air" data-tour="air">
         <legend className="visually-hidden">Condiciones del aire</legend>
         <span>Aire</span>
         <NumberField
@@ -54,14 +55,22 @@ export function TopBar() {
         />
       </fieldset>
 
-      <label className="theme-select">
-        <span className="visually-hidden">Tema</span>
-        <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeChoice)}>
-          <option value="system">Tema del sistema</option>
-          <option value="light">Tema claro</option>
-          <option value="dark">Tema oscuro</option>
-        </select>
-      </label>
+      <div className="topbar-end" data-tour="topbar-end">
+        <button type="button" className="button tour-button" onClick={startTour}>
+          <span className="tour-glyph" aria-hidden="true">
+            ?
+          </span>
+          Tour guiado
+        </button>
+        <label className="theme-select">
+          <span className="visually-hidden">Tema</span>
+          <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeChoice)}>
+            <option value="system">Tema del sistema</option>
+            <option value="light">Tema claro</option>
+            <option value="dark">Tema oscuro</option>
+          </select>
+        </label>
+      </div>
     </header>
   );
 }
