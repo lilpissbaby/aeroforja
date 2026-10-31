@@ -74,11 +74,15 @@ export type InertiaSpec =
     }
   /** Homogeneous solid sphere. */
   | { readonly kind: "sphere"; readonly radius: Meters }
-  /** Tensor about the component's own centre of mass, in its axes, from a test or a datasheet. */
+  /**
+   * Tensor about the component's own centre of mass, in its axes: MEASURED
+   * (a test), ESTIMATED (a datasheet) or CALCULATED by a published method
+   * outside this module (e.g. the polyhedral mass properties of an STL part).
+   */
   | {
       readonly kind: "given";
       readonly tensor: InertiaTensor;
-      readonly provenance: "MEASURED" | "ESTIMATED";
+      readonly provenance: "MEASURED" | "CALCULATED" | "ESTIMATED";
     };
 
 const positive = (value: number, what: string): number => {

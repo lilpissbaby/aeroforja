@@ -22,9 +22,12 @@ export function analysisFor(planform: Planform): PlanformAnalysis {
           },
         ],
         bounds: null,
+        box: null,
         projectedArea: 0,
+        frontalArea: 0,
         volume: 0,
         wing: null,
+        vertical: null,
         rotorSummary: null,
       };
     }

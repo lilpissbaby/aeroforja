@@ -1,10 +1,14 @@
 /**
- * 2D planform editor: the aircraft seen from above on a cartesian plane in
- * millimetres, nose up, as the specification's editor asks (own SVG, with
- * dimensions, grid snapping and automatic symmetry).
+ * 2D editor of one view of the three-view drawing: planta (from above, nose
+ * up), alzado (from the front) or perfil (from the right, nose to the
+ * right), each a cartesian plane in millimetres with grid snapping,
+ * dimensions and automatic symmetry, as the specification's editor asks
+ * (own SVG).
  *
- * Everything drawn is stored in SI and body axes FRD (x forward, y right);
- * the conversion to screen pixels lives in planform/view.ts.
+ * The elements of the other two views appear as dashed silhouettes so the
+ * three views line up, and can be picked from here. Everything is stored in
+ * SI and body axes FRD; screen conversions live in planform/view.ts and
+ * planform/planes.ts.
  */
 import {
   useCallback,
@@ -17,12 +21,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { meters } from "@aeroforja/physics";
-import { elementBounds, elementOutlines, type Ring, type Vec2 } from "../../planform/geometry.ts";
+import { elementBox, elementOutlines, projectToView, unionBox, type Box3, type Ring, type Vec2 } from "../../planform/geometry.ts";
 import {
   DEFAULT_THICKNESS,
   ROLE_LABELS,
-  defaultZ,
-  planPoint,
+  defaultOffset,
+  planePoint,
   roundMicro,
   translateElement,
   uniqueElementId,
@@ -32,6 +36,7 @@ import {
   type PlanformRole,
   type PolygonElement,
 } from "../../planform/model.ts";
+import { AXIS_NAMES, PLANE_SPECS, SCREEN_AXES, VIEW_DIMENSIONS, screenToPlane, type PlaneId } from "../../planform/planes.ts";
 import {
   fitCamera,
   gridFor,
@@ -39,17 +44,18 @@ import {
   mm1,
   project,
   rulerLabel,
+  screenBox,
   snapPoint,
   snapStep,
+  symmetryIndex,
   unproject,
   type Camera,
   type SnapKind,
-  type SnapSetting,
 } from "../../planform/view.ts";
-import { useAppStore } from "../../state/store.ts";
-import { usePlanformAnalysis } from "./usePlanformAnalysis.ts";
-
-type Tool = "select" | "polygon" | "rect" | "circle";
+import { useAppStore, type Tool } from "../../state/store.ts";
+import { usePlanformAnalysis } from "../planform/usePlanformAnalysis.ts";
+import { chooseTool } from "./DrawToolbar.tsx";
+import { usePartSilhouettes } from "./usePartSilhouettes.ts";
 
 type Drag =
   | { kind: "pan"; startClient: Vec2; startView: ViewState; moved: boolean; clickClears: boolean }
@@ -76,25 +82,24 @@ const MIN_SIZE = 0.0005;
 
 const ID_BASE: Readonly<Record<PlanformRole, string>> = { plate: "placa", wing: "ala", hole: "vaciado", rotor: "helice" };
 
-const TOOL_LABELS: readonly (readonly [Tool, string, string])[] = [
-  ["select", "Seleccionar", "V"],
-  ["polygon", "Contorno", "P"],
-  ["rect", "Rectángulo", "R"],
-  ["circle", "Círculo", "C"],
-];
-
 const HINTS: Readonly<Record<Tool, string>> = {
   select:
-    "Clic para elegir; arrastra piezas, vértices (■) o puntos medios (+) para añadir vértices. Doble clic en un vértice lo borra. Arrastra el fondo para desplazarte, rueda para el zoom.",
+    "Clic para elegir (también las siluetas discontinuas de las otras vistas); arrastra piezas, vértices (■) o puntos medios (+). Doble clic en un vértice lo borra. Flechas: mover; Av/Re Pág: mover el plano medio.",
   polygon:
     "Clic para añadir vértices. Cierra con clic en el primero, doble clic o Intro. Retroceso borra el último, Esc cancela, Mayús fija ángulos de 15°.",
   rect: "Arrastra de una esquina a la opuesta.",
   circle: "Pulsa en el centro y arrastra hasta el radio.",
 };
 
+const EMPTY_TEXT: Readonly<Record<PlaneId, string>> = {
+  top: "Planta vacía. Dibuja con «Contorno», «Rectángulo» o «Círculo», o parte de una plantilla del panel izquierdo.",
+  side: "Perfil vacío. Aquí van las derivas, el fuselaje visto de lado, los trenes y los soportes verticales.",
+  front: "Alzado vacío. Aquí van las cuadernas, el diedro visto de frente y las hélices tractoras o propulsoras.",
+};
+
 const SNAP_NAMES: Readonly<Record<SnapKind, string>> = {
   vertex: "ajuste a vértice",
-  axis: "ajuste al eje de simetría",
+  axis: "ajuste al plano de simetría",
   grid: "ajuste a rejilla",
   angle: "ángulo fijado",
   none: "",
@@ -109,33 +114,11 @@ function nextName(planform: Planform, role: PlanformRole): string {
   return `${ROLE_LABELS[role].replace(" (disco)", "")} ${count + 1}`;
 }
 
-function allBounds(planform: Planform) {
-  let box: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
-  for (const e of planform.elements) {
-    const b = elementBounds(e);
-    box =
-      box === null
-        ? { ...b }
-        : { minX: Math.min(box.minX, b.minX), maxX: Math.max(box.maxX, b.maxX), minY: Math.min(box.minY, b.minY), maxY: Math.max(box.maxY, b.maxY) };
-  }
+/** Body box of the whole drawing, every view and the imported parts. */
+function drawingBox(planform: Planform, extra: Box3 | null): Box3 | null {
+  let box: Box3 | null = extra;
+  for (const e of planform.elements) box = unionBox(box, elementBox(e));
   return box;
-}
-
-function snapTargets(planform: Planform, exclude?: { id: string; index: number }): Vec2[] {
-  const out: Vec2[] = [];
-  for (const e of planform.elements) {
-    if (e.shape === "polygon") {
-      e.points.forEach((p, i) => {
-        if (exclude !== undefined && exclude.id === e.id && exclude.index === i) return;
-        out.push([p.x, p.y]);
-        if (e.mirror) out.push([p.x, -p.y]);
-      });
-    } else {
-      out.push([e.center.x, e.center.y]);
-      if (e.mirror) out.push([e.center.x, -e.center.y]);
-    }
-  }
-  return out;
 }
 
 /** Removes repeated consecutive points (a double click adds the last one twice). */
@@ -154,46 +137,70 @@ const replaceElement = (planform: Planform, element: PlanformElement): Planform 
   elements: planform.elements.map((e) => (e.id === element.id ? element : e)),
 });
 
-export function PlanformEditor() {
+/** A silhouette of an element of another view, in this view's plane coordinates. */
+interface Ghost {
+  readonly key: string;
+  readonly elementId: string;
+  readonly role: PlanformRole;
+  readonly ring: Ring;
+}
+
+export interface PlaneEditorProps {
+  readonly plane: PlaneId;
+  /** The only 2D view on screen: it owns the keyboard without being the active view. */
+  readonly exclusive: boolean;
+  /** Smaller status line, for the three-view layout. */
+  readonly compact?: boolean;
+}
+
+export function PlaneEditor({ plane, exclusive, compact = false }: PlaneEditorProps) {
+  const spec = PLANE_SPECS[plane];
+  const axes = SCREEN_AXES[plane];
+  const sym = symmetryIndex(plane);
   const planform = useAppStore((s) => s.planform);
   const selectedId = useAppStore((s) => s.planSelectedId);
   const fitRequest = useAppStore((s) => s.fitRequest);
-  const canUndo = useAppStore((s) => s.planPast.length > 0);
-  const canRedo = useAppStore((s) => s.planFuture.length > 0);
+  const editor = useAppStore((s) => s.editor);
+  const active = useAppStore((s) => s.editor.activePlane === plane);
   const analysis = usePlanformAnalysis();
+  const parts = usePartSilhouettes(plane);
+  const { tool, role, mirror: mirrorNew } = editor;
 
-  const [tool, setToolState] = useState<Tool>("select");
-  const [role, setRoleState] = useState<PlanformRole>("plate");
-  const [mirrorNew, setMirrorNew] = useState(true);
-  const [snapSetting, setSnapSetting] = useState<SnapSetting>("auto");
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<ViewState | null>(null);
   const [cursor, setCursor] = useState<{ point: Vec2; kind: SnapKind } | null>(null);
   const [draft, setDraft] = useState<Vec2[]>([]);
   const [preview, setPreview] = useState<Preview>(null);
   const [activeVertex, setActiveVertex] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const cam: Camera = { ...(view ?? { cx: 0, cy: 0, scale: 1.5 }), w: size.w, h: size.h };
-  const step = snapStep(snapSetting, cam.scale);
+  const cam: Camera = { plane, ...(view ?? { cx: 0, cy: 0, scale: 1.5 }), w: size.w, h: size.h };
+  const step = snapStep(editor.snap, cam.scale);
   const snapRadius = SNAP_PIXELS / cam.scale / 1000;
-  const selected = planform.elements.find((e) => e.id === selectedId) ?? null;
+  const selectedAny = planform.elements.find((e) => e.id === selectedId) ?? null;
+  const selected = selectedAny !== null && selectedAny.plane === plane ? selectedAny : null;
 
-  const setTool = useCallback((next: Tool) => {
-    setToolState(next);
+  /** In-plane mirror image of a point about y = 0, when y is an in-plane axis. */
+  const mirrorPoint = useCallback(
+    (p: Vec2): Vec2 | null => (sym === 0 ? [-p[0], p[1]] : sym === 1 ? [p[0], -p[1]] : null),
+    [sym],
+  );
+
+  // A new tool or another view starting a shape cancels this view's draft.
+  useEffect(() => {
     setDraft([]);
     setPreview(null);
     dragRef.current = null;
-    // A propeller disc is always a circle.
-    if (next !== "circle" && next !== "select") setRoleState((r) => (r === "rotor" ? "plate" : r));
-  }, []);
+  }, [tool, role]);
 
-  const setRole = (next: PlanformRole) => {
-    setRoleState(next);
-    if (next === "rotor" && tool !== "circle") setTool("circle");
-  };
+  useEffect(() => {
+    if (notice === null) return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   // ---------- size and view ----------
 
@@ -207,17 +214,18 @@ export function PlanformEditor() {
     return () => observer.disconnect();
   }, []);
 
+  const partsBox = parts.box;
   const fit = useCallback(() => {
     const { planform: current } = useAppStore.getState();
-    const c = fitCamera(allBounds(current), size.w, size.h);
+    const c = fitCamera(plane, drawingBox(current, partsBox), size.w, size.h);
     setView({ cx: c.cx, cy: c.cy, scale: c.scale });
-  }, [size.w, size.h]);
+  }, [plane, size.w, size.h, partsBox]);
 
   useEffect(() => {
     if (view === null && size.w > 0 && size.h > 0) fit();
   }, [view, size.w, size.h, fit]);
 
-  // Templates and opened files ask both views to frame the new drawing.
+  // Templates, opened files and the toolbar ask every view to frame the drawing.
   const lastFit = useRef(fitRequest);
   useEffect(() => {
     if (fitRequest !== lastFit.current && size.w > 0) {
@@ -247,35 +255,81 @@ export function PlanformEditor() {
     return () => svg.removeEventListener("wheel", onWheel);
   }, []);
 
+  // ---------- what this view shows ----------
+
+  const own = useMemo(() => planform.elements.filter((e) => e.plane === plane), [planform, plane]);
+
+  const ghosts = useMemo(() => {
+    const out: Ghost[] = [];
+    for (const e of planform.elements) {
+      if (e.plane === plane || e.role === "hole") continue;
+      const thickness = e.role === "rotor" ? 0 : e.thickness;
+      for (const o of elementOutlines(e)) {
+        out.push({ key: `${e.id}-${o.mirrored}`, elementId: e.id, role: e.role, ring: projectToView(e.plane, o.ring, o.offset, thickness, plane) });
+      }
+    }
+    return out;
+  }, [planform, plane]);
+
+  const snapTargets = useCallback(
+    (exclude?: { id: string; index: number }): Vec2[] => {
+      const out: Vec2[] = [];
+      const add = (p: Vec2, mirrored: boolean) => {
+        out.push(p);
+        const m = mirrored ? mirrorPoint(p) : null;
+        if (m !== null) out.push(m);
+      };
+      for (const e of own) {
+        if (e.shape === "polygon") {
+          e.points.forEach((p, i) => {
+            if (exclude !== undefined && exclude.id === e.id && exclude.index === i) return;
+            add([p.u, p.v], e.mirror);
+          });
+        } else add([e.center.u, e.center.v], e.mirror);
+      }
+      // Corners of the other views' silhouettes, to line the three views up.
+      for (const g of ghosts) out.push(...g.ring);
+      for (const g of parts.rings) out.push(...g.ring);
+      return out;
+    },
+    [own, ghosts, parts.rings, mirrorPoint],
+  );
+
   // ---------- creating elements ----------
 
-  const createPolygon = (points: readonly Vec2[], forcedRole?: PlanformRole) => {
+  const createPolygon = (points: readonly Vec2[]) => {
     const clean = cleanRing(points);
     if (clean.length < 3) return;
-    const r = forcedRole ?? (role === "rotor" ? "plate" : role);
+    const r = role === "rotor" ? "plate" : role;
     const element: PolygonElement = {
       id: uniqueElementId(planform, ID_BASE[r]),
       name: nextName(planform, r),
       role: r,
+      plane,
       shape: "polygon",
       mirror: mirrorNew,
       thickness: DEFAULT_THICKNESS,
-      z: defaultZ(r),
-      points: clean.map(([x, y]) => planPoint(roundMicro(x), roundMicro(y))),
+      offset: defaultOffset(r, plane),
+      points: clean.map(([u, v]) => planePoint(roundMicro(u), roundMicro(v))),
     };
     useAppStore.getState().addPlanElements([element]);
   };
 
   const createCircle = (c: Vec2, radius: number) => {
+    if (role === "rotor" && plane === "side") {
+      setNotice("Las hélices se dibujan en la planta (eje vertical, multirrotor) o en el alzado (tractora o propulsora).");
+      return;
+    }
     const element: CircleElement = {
       id: uniqueElementId(planform, ID_BASE[role]),
       name: nextName(planform, role),
       role,
+      plane,
       shape: "circle",
       mirror: mirrorNew,
       thickness: DEFAULT_THICKNESS,
-      z: defaultZ(role),
-      center: planPoint(roundMicro(c[0]), roundMicro(c[1])),
+      offset: defaultOffset(role, plane),
+      center: planePoint(roundMicro(c[0]), roundMicro(c[1])),
       radius: meters(roundMicro(radius)),
     };
     useAppStore.getState().addPlanElements([element]);
@@ -296,22 +350,25 @@ export function PlanformEditor() {
   const snapFor = (p: Vec2, shift: boolean): { point: Vec2; kind: SnapKind } => {
     const drag = dragRef.current;
     if (drag?.kind === "vertex") {
-      return snapPoint(p, { step, radius: snapRadius, targets: snapTargets(planform, { id: drag.id, index: drag.index }) });
+      return snapPoint(p, { step, radius: snapRadius, symmetry: sym, targets: snapTargets({ id: drag.id, index: drag.index }) });
     }
     if (tool === "polygon") {
       return snapPoint(p, {
         step,
         radius: snapRadius,
-        targets: [...snapTargets(planform), ...draft],
+        symmetry: sym,
+        targets: [...snapTargets(), ...draft],
         from: draft[draft.length - 1] ?? null,
         lockAngle: shift,
       });
     }
-    return snapPoint(p, { step, radius: snapRadius, targets: snapTargets(planform) });
+    return snapPoint(p, { step, radius: snapRadius, symmetry: sym, targets: snapTargets() });
   };
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (view === null) return;
+    const store = useAppStore.getState();
+    if (store.editor.activePlane !== plane) store.setEditor({ activePlane: plane });
     const q = local(e);
     const p = unproject(cam, q);
     svgRef.current?.setPointerCapture(e.pointerId);
@@ -322,15 +379,11 @@ export function PlanformEditor() {
     }
     if (e.button !== 0) return;
     const snapped = snapFor(p, e.shiftKey);
-    const store = useAppStore.getState();
 
     if (tool === "polygon") {
       const first = draft[0];
-      if (draft.length >= 3 && first !== undefined && dist(snapped.point, first) <= snapRadius) {
-        finishDraft();
-      } else {
-        setDraft([...draft, snapped.point]);
-      }
+      if (draft.length >= 3 && first !== undefined && dist(snapped.point, first) <= snapRadius) finishDraft();
+      else setDraft([...draft, snapped.point]);
       return;
     }
     if (tool === "rect") {
@@ -345,9 +398,10 @@ export function PlanformEditor() {
     }
 
     // Select tool.
-    const target = (e.target as Element).closest("[data-handle],[data-element]");
+    const target = (e.target as Element).closest("[data-handle],[data-element],[data-silhouette]");
     const handle = target?.getAttribute("data-handle") ?? null;
     const elementId = target?.getAttribute("data-element") ?? null;
+    const silhouetteId = target?.getAttribute("data-silhouette") ?? null;
     if (handle !== null && selected !== null) {
       const index = Number(target?.getAttribute("data-index") ?? "-1");
       if (handle === "vertex") {
@@ -358,7 +412,7 @@ export function PlanformEditor() {
       if (handle === "mid" && selected.shape === "polygon") {
         const a = selected.points[index]!;
         const b = selected.points[(index + 1) % selected.points.length]!;
-        const mid = planPoint(roundMicro((a.x + b.x) / 2), roundMicro((a.y + b.y) / 2));
+        const mid = planePoint(roundMicro((a.u + b.u) / 2), roundMicro((a.v + b.v) / 2));
         const points = [...selected.points.slice(0, index + 1), mid, ...selected.points.slice(index + 1)];
         store.beginPlanGesture();
         store.setPlanformLive(replaceElement(planform, { ...selected, points }));
@@ -391,6 +445,12 @@ export function PlanformEditor() {
       };
       return;
     }
+    if (silhouetteId !== null) {
+      // Elements of other views are picked here and edited in their own view.
+      store.selectPlanElement(silhouetteId);
+      setActiveVertex(null);
+      return;
+    }
     dragRef.current = { kind: "pan", startClient: q, startView: view, moved: false, clickClears: true };
   };
 
@@ -420,14 +480,16 @@ export function PlanformEditor() {
           store.beginPlanGesture();
           dragRef.current = { ...drag, moved: true };
         }
-        let dx = p[0] - drag.start[0];
-        let dy = p[1] - drag.start[1];
+        let du = p[0] - drag.start[0];
+        let dv = p[1] - drag.start[1];
         if (step !== null) {
-          dx = Math.round(dx / step) * step;
-          dy = Math.round(dy / step) * step;
+          du = Math.round(du / step) * step;
+          dv = Math.round(dv / step) * step;
         }
-        if (drag.mirrored) dy = -dy;
-        store.setPlanformLive(replaceElement(current, translateElement(drag.original, dx, dy)));
+        // Dragging the mirror image moves the original the mirrored way.
+        if (drag.mirrored && sym === 0) du = -du;
+        if (drag.mirrored && sym === 1) dv = -dv;
+        store.setPlanformLive(replaceElement(current, translateElement(drag.original, du, dv)));
         return;
       }
       case "vertex": {
@@ -439,7 +501,7 @@ export function PlanformEditor() {
           dragRef.current = { ...drag, moved: true };
         }
         const points = element.points.map((pt, i) =>
-          i === drag.index ? planPoint(roundMicro(snapped.point[0]), roundMicro(snapped.point[1])) : pt,
+          i === drag.index ? planePoint(roundMicro(snapped.point[0]), roundMicro(snapped.point[1])) : pt,
         );
         store.setPlanformLive(replaceElement(current, { ...element, points }));
         return;
@@ -452,7 +514,7 @@ export function PlanformEditor() {
           store.beginPlanGesture();
           dragRef.current = { ...drag, moved: true };
         }
-        let radius = dist(p, [element.center.x, element.center.y]);
+        let radius = dist(p, [element.center.u, element.center.v]);
         if (step !== null) radius = Math.max(step, Math.round(radius / step) * step);
         store.setPlanformLive(replaceElement(current, { ...element, radius: meters(roundMicro(Math.max(radius, MIN_SIZE))) }));
         return;
@@ -475,14 +537,14 @@ export function PlanformEditor() {
       setActiveVertex(null);
     }
     if (drag.kind === "rect" && end !== undefined) {
-      const [ax, ay] = drag.a;
-      const [bx, by] = end;
-      if (Math.abs(bx - ax) >= MIN_SIZE && Math.abs(by - ay) >= MIN_SIZE) {
+      const [au, av] = drag.a;
+      const [bu, bv] = end;
+      if (Math.abs(bu - au) >= MIN_SIZE && Math.abs(bv - av) >= MIN_SIZE) {
         createPolygon([
-          [ax, ay],
-          [ax, by],
-          [bx, by],
-          [bx, ay],
+          [au, av],
+          [au, bv],
+          [bu, bv],
+          [bu, av],
         ]);
       }
       setPreview(null);
@@ -513,11 +575,12 @@ export function PlanformEditor() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // The guided tour owns the keyboard while it is open.
-      if (useAppStore.getState().panel !== "planform" || useAppStore.getState().tourStep !== null) return;
+      const store = useAppStore.getState();
+      // The guided tour owns the keyboard while it is open; with several views, the active one takes it.
+      if (store.panel !== "planform" || store.tourStep !== null) return;
+      if (!exclusive && store.editor.activePlane !== plane) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable='true']") != null) return;
-      const store = useAppStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
       if (mod && key === "z") {
@@ -538,6 +601,7 @@ export function PlanformEditor() {
       }
       if (mod || e.altKey) return;
       const current = store.planform.elements.find((el) => el.id === store.planSelectedId);
+      const amount = (step ?? 0.001) * (e.shiftKey ? 10 : 1);
       switch (e.key) {
         case "Escape":
           if (draft.length > 0) setDraft([]);
@@ -545,7 +609,7 @@ export function PlanformEditor() {
             setPreview(null);
             dragRef.current = null;
           } else if (store.planSelectedId !== null) store.selectPlanElement(null);
-          else setTool("select");
+          else chooseTool("select");
           return;
         case "Enter":
           if (tool === "polygon") finishDraft();
@@ -558,7 +622,7 @@ export function PlanformEditor() {
             return;
           }
           if (current === undefined) return;
-          if (current.shape === "polygon" && activeVertex !== null && current.points.length > 3) {
+          if (current.shape === "polygon" && current.plane === plane && activeVertex !== null && current.points.length > 3) {
             store.updatePlanElement(current.id, (el) =>
               el.shape === "polygon" ? { ...el, points: el.points.filter((_, i) => i !== activeVertex) } : el,
             );
@@ -571,30 +635,37 @@ export function PlanformEditor() {
         case "ArrowDown":
         case "ArrowLeft":
         case "ArrowRight": {
-          if (current === undefined) return;
+          if (current === undefined || current.plane !== plane) return;
           e.preventDefault();
-          const amount = (step ?? 0.001) * (e.shiftKey ? 10 : 1);
-          const dx = e.key === "ArrowUp" ? amount : e.key === "ArrowDown" ? -amount : 0;
-          const dy = e.key === "ArrowRight" ? amount : e.key === "ArrowLeft" ? -amount : 0;
-          store.updatePlanElement(current.id, (el) => translateElement(el, dx, dy));
+          const h = e.key === "ArrowRight" ? amount : e.key === "ArrowLeft" ? -amount : 0;
+          const v = e.key === "ArrowDown" ? amount : e.key === "ArrowUp" ? -amount : 0;
+          const [du, dv] = screenToPlane(plane, h, v);
+          store.updatePlanElement(current.id, (el) => translateElement(el, du, dv));
+          return;
+        }
+        case "PageUp":
+        case "PageDown": {
+          if (current === undefined || current.plane !== plane) return;
+          e.preventDefault();
+          store.updatePlanElement(current.id, (el) => translateElement(el, 0, 0, e.key === "PageUp" ? amount : -amount));
           return;
         }
       }
       switch (key) {
         case "v":
-          setTool("select");
+          chooseTool("select");
           return;
         case "p":
-          setTool("polygon");
+          chooseTool("polygon");
           return;
         case "r":
-          setTool("rect");
+          chooseTool("rect");
           return;
         case "c":
-          setTool("circle");
+          chooseTool("circle");
           return;
         case "f":
-          fit();
+          store.requestFit();
           return;
       }
     };
@@ -621,7 +692,7 @@ export function PlanformEditor() {
       const px = r1((v - cam.cx) * cam.scale + cam.w / 2);
       if (isMajor(v)) {
         majorPath += `M${px} 0V${cam.h}`;
-        vLabels.push({ pos: px, value: v });
+        vLabels.push({ pos: px, value: axes.hSign * v });
       } else minorPath += `M${px} 0V${cam.h}`;
     }
     for (let k = Math.ceil(y0 / minor); k <= Math.floor(y1 / minor); k++) {
@@ -629,17 +700,17 @@ export function PlanformEditor() {
       const py = r1((v - cam.cy) * cam.scale + cam.h / 2);
       if (isMajor(v)) {
         majorPath += `M0 ${py}H${cam.w}`;
-        hLabels.push({ pos: py, value: -v });
+        hLabels.push({ pos: py, value: axes.vSign * v });
       } else minorPath += `M0 ${py}H${cam.w}`;
     }
     return { minorPath, majorPath, vLabels, hLabels, minor };
-  }, [cam.cx, cam.cy, cam.scale, cam.w, cam.h, size.w, view]);
+  }, [cam.cx, cam.cy, cam.scale, cam.w, cam.h, size.w, view, axes.hSign, axes.vSign]);
 
   const invalidIds = new Set(analysis.issues.filter((i) => i.level === "red" && i.elementId !== undefined).map((i) => i.elementId));
   const ordered = [
-    ...planform.elements.filter((e) => e.role === "plate" || e.role === "wing"),
-    ...planform.elements.filter((e) => e.role === "hole"),
-    ...planform.elements.filter((e) => e.role === "rotor"),
+    ...own.filter((e) => e.role === "plate" || e.role === "wing"),
+    ...own.filter((e) => e.role === "hole"),
+    ...own.filter((e) => e.role === "rotor"),
   ];
   const origin = project(cam, [0, 0]);
 
@@ -653,7 +724,8 @@ export function PlanformEditor() {
     ].join(" ");
     const common = { "data-element": element.id, "data-mirrored": String(mirrored), className };
     if (element.shape === "circle") {
-      const c = project(cam, [element.center.x, mirrored ? -element.center.y : element.center.y]);
+      const centre: Vec2 = [element.center.u, element.center.v];
+      const c = project(cam, mirrored ? (mirrorPoint(centre) ?? centre) : centre);
       const r = element.radius * 1000 * cam.scale;
       if (element.role === "rotor") {
         return (
@@ -669,32 +741,40 @@ export function PlanformEditor() {
     return <polygon key={`${element.id}-${mirrored}`} {...common} points={pts(cam, ring)} />;
   };
 
+  // In the perfil the mirror image of an element sits behind it (same outline at −y): draw it once.
+  const outlinesOf = (element: PlanformElement) =>
+    elementOutlines(element).filter((o) => !(o.mirrored && sym === null));
+
   const dimensions = (() => {
-    const b = analysis.bounds;
-    if (b === null || draft.length > 0 || preview !== null) return null;
-    const leftFront = project(cam, [b.maxX, b.minY]);
-    const leftRear = project(cam, [b.minX, b.minY]);
-    const rightRear = project(cam, [b.minX, b.maxY]);
-    // Span below the tail, so it never sits on the "x · adelante" axis label at the top.
-    const yLine = leftRear[1] + 26;
-    const xLine = leftFront[0] - 26;
+    const box = unionBox(analysis.box, parts.box);
+    if (box === null || draft.length > 0 || preview !== null || view === null) return null;
+    const b = screenBox(plane, box);
+    const X = (sx: number) => (sx - cam.cx) * cam.scale + cam.w / 2;
+    const Y = (sy: number) => (sy - cam.cy) * cam.scale + cam.h / 2;
+    const left = X(b.minX);
+    const right = X(b.maxX);
+    const top = Y(b.minY);
+    const bottom = Y(b.maxY);
+    const yLine = bottom + 26;
+    const xLine = left - 26;
+    const names = VIEW_DIMENSIONS[plane];
     return (
       <g className="plan-dim" aria-hidden="true">
-        <path d={`M${r1(leftRear[0])} ${r1(leftRear[1] + 4)}V${r1(yLine + 6)}M${r1(rightRear[0])} ${r1(rightRear[1] + 4)}V${r1(yLine + 6)}`} className="ext" />
-        <line x1={r1(leftRear[0])} y1={r1(yLine)} x2={r1(rightRear[0])} y2={r1(yLine)} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
-        <text x={r1((leftRear[0] + rightRear[0]) / 2)} y={r1(yLine + 16)} textAnchor="middle" className="plan-text">
-          {`Envergadura ${mm1(b.maxY - b.minY)} mm`}
+        <path d={`M${r1(left)} ${r1(bottom + 4)}V${r1(yLine + 6)}M${r1(right)} ${r1(bottom + 4)}V${r1(yLine + 6)}`} className="ext" />
+        <line x1={r1(left)} y1={r1(yLine)} x2={r1(right)} y2={r1(yLine)} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
+        <text x={r1((left + right) / 2)} y={r1(yLine + 16)} textAnchor="middle" className="plan-text">
+          {`${names.horizontal} ${mm1((b.maxX - b.minX) / 1000)} mm`}
         </text>
-        <path d={`M${r1(leftFront[0] - 4)} ${r1(leftFront[1])}H${r1(xLine - 6)}M${r1(leftRear[0] - 4)} ${r1(leftRear[1])}H${r1(xLine - 6)}`} className="ext" />
-        <line x1={r1(xLine)} y1={r1(leftFront[1])} x2={r1(xLine)} y2={r1(leftRear[1])} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
+        <path d={`M${r1(left - 4)} ${r1(top)}H${r1(xLine - 6)}M${r1(left - 4)} ${r1(bottom)}H${r1(xLine - 6)}`} className="ext" />
+        <line x1={r1(xLine)} y1={r1(top)} x2={r1(xLine)} y2={r1(bottom)} markerStart="url(#plan-arrow)" markerEnd="url(#plan-arrow)" />
         <text
           x={r1(xLine - 6)}
-          y={r1((leftFront[1] + leftRear[1]) / 2)}
+          y={r1((top + bottom) / 2)}
           textAnchor="middle"
           className="plan-text"
-          transform={`rotate(-90 ${r1(xLine - 6)} ${r1((leftFront[1] + leftRear[1]) / 2)})`}
+          transform={`rotate(-90 ${r1(xLine - 6)} ${r1((top + bottom) / 2)})`}
         >
-          {`Longitud ${mm1(b.maxX - b.minX)} mm`}
+          {`${names.vertical} ${mm1((b.maxY - b.minY) / 1000)} mm`}
         </text>
       </g>
     );
@@ -703,9 +783,11 @@ export function PlanformEditor() {
   const selectionOverlay = (() => {
     if (selected === null || tool !== "select") return null;
     if (selected.shape === "circle") {
-      const c = project(cam, [selected.center.x, selected.center.y]);
-      const h = project(cam, [selected.center.x, selected.center.y + selected.radius]);
-      const inches = selected.role === "rotor" ? ` · ${(selected.radius * 2 / 0.0254).toFixed(1).replace(".", ",")}″` : "";
+      const centre: Vec2 = [selected.center.u, selected.center.v];
+      const [du, dv] = screenToPlane(plane, selected.radius, 0);
+      const c = project(cam, centre);
+      const h = project(cam, [centre[0] + du, centre[1] + dv]);
+      const inches = selected.role === "rotor" ? ` · ${((selected.radius * 2) / 0.0254).toFixed(1).replace(".", ",")}″` : "";
       return (
         <g className="plan-selection">
           <line x1={r1(c[0])} y1={r1(c[1])} x2={r1(h[0])} y2={r1(h[1])} className="radius-line" />
@@ -717,7 +799,7 @@ export function PlanformEditor() {
         </g>
       );
     }
-    const ring = selected.points.map((p) => [p.x, p.y] as Vec2);
+    const ring = selected.points.map((p) => [p.u, p.v] as Vec2);
     const screen = ring.map((p) => project(cam, p));
     const cx = screen.reduce((s, p) => s + p[0], 0) / screen.length;
     const cy = screen.reduce((s, p) => s + p[1], 0) / screen.length;
@@ -759,19 +841,24 @@ export function PlanformEditor() {
     );
   })();
 
+  const mirrorChain = (chain: readonly Vec2[]): Vec2[] | null => {
+    if (!mirrorNew || sym === null) return null;
+    return chain.map((p) => mirrorPoint(p)!);
+  };
+
   const draftOverlay = (() => {
     const c = cursor?.point;
     if (tool === "polygon" && draft.length > 0) {
       const chain = c === undefined ? draft : [...draft, c];
       const screen = chain.map((p) => project(cam, p));
-      const mirrorScreen = mirrorNew ? chain.map(([x, y]) => project(cam, [x, -y])) : null;
+      const mirrored = mirrorChain(chain);
       const last = draft[draft.length - 1]!;
       const first = draft[0]!;
       const closing = c !== undefined && draft.length >= 3 && dist(c, first) <= snapRadius;
       const cs = c === undefined ? null : project(cam, c);
       return (
         <g className="plan-draft">
-          {mirrorScreen !== null && <polyline points={mirrorScreen.map((p) => p.map(r1).join(",")).join(" ")} className="mirror" />}
+          {mirrored !== null && <polyline points={mirrored.map((p) => project(cam, p).map(r1).join(",")).join(" ")} className="mirror" />}
           <polyline points={screen.map((p) => p.map(r1).join(",")).join(" ")} />
           {draft.map((p, i) => {
             const s = project(cam, p);
@@ -787,10 +874,11 @@ export function PlanformEditor() {
     }
     if (preview?.kind === "rect" && c !== undefined) {
       const ring: Ring = [preview.a, [preview.a[0], c[1]], c, [c[0], preview.a[1]]];
+      const mirrored = mirrorChain(ring);
       const cs = project(cam, c);
       return (
         <g className="plan-draft">
-          {mirrorNew && <polygon points={pts(cam, ring.map(([x, y]) => [x, -y] as Vec2))} className="mirror" />}
+          {mirrored !== null && <polygon points={pts(cam, mirrored)} className="mirror" />}
           <polygon points={pts(cam, ring)} />
           <text x={r1(cs[0] + 14)} y={r1(cs[1] - 12)} className="plan-text strong">
             {`${mm1(Math.abs(c[0] - preview.a[0]))} × ${mm1(Math.abs(c[1] - preview.a[1]))} mm`}
@@ -801,11 +889,12 @@ export function PlanformEditor() {
     if (preview?.kind === "circle" && c !== undefined) {
       const center = project(cam, preview.c);
       const r = dist(preview.c, c) * 1000 * cam.scale;
-      const mirrorCenter = project(cam, [preview.c[0], -preview.c[1]]);
+      const m = mirrorNew ? mirrorPoint(preview.c) : null;
+      const mirrorCenter = m !== null && dist(m, preview.c) > 1e-9 ? project(cam, m) : null;
       const cs = project(cam, c);
       return (
         <g className="plan-draft">
-          {mirrorNew && Math.abs(preview.c[1]) > 1e-9 && <circle cx={r1(mirrorCenter[0])} cy={r1(mirrorCenter[1])} r={r1(r)} className="mirror" />}
+          {mirrorCenter !== null && <circle cx={r1(mirrorCenter[0])} cy={r1(mirrorCenter[1])} r={r1(r)} className="mirror" />}
           <circle cx={r1(center[0])} cy={r1(center[1])} r={r1(r)} />
           <line x1={r1(center[0])} y1={r1(center[1])} x2={r1(cs[0])} y2={r1(cs[1])} />
           <text x={r1(cs[0] + 14)} y={r1(cs[1] - 12)} className="plan-text strong">
@@ -825,61 +914,11 @@ export function PlanformEditor() {
     return <path d={`M${r1(x - 8)} ${r1(y)}H${r1(x + 8)}M${r1(x)} ${r1(y - 8)}V${r1(y + 8)}`} className="plan-cursor" />;
   })();
 
-  return (
-    <div className="plan-editor">
-      <div className="plan-toolbar" role="toolbar" aria-label="Herramientas de la planta" data-tour="plan-toolbar">
-        <div className="seg" role="group" aria-label="Herramienta">
-          {TOOL_LABELS.map(([id, label, key]) => (
-            <button key={id} type="button" aria-pressed={tool === id} onClick={() => setTool(id)} title={`${label} (${key})`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <label className="inline">
-          <span>Tipo</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as PlanformRole)}>
-            {(["plate", "wing", "hole", "rotor"] as const).map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="inline check">
-          <input type="checkbox" checked={mirrorNew} onChange={(e) => setMirrorNew(e.target.checked)} />
-          <span>Simetría</span>
-        </label>
-        <label className="inline">
-          <span>Rejilla</span>
-          <select
-            value={String(snapSetting)}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSnapSetting(v === "off" || v === "auto" ? v : Number(v));
-            }}
-          >
-            <option value="auto">auto ({mm1(gridFor(cam.scale).minor / 1000)} mm)</option>
-            {[0.5, 1, 2, 5, 10].map((v) => (
-              <option key={v} value={String(v)}>
-                {String(v).replace(".", ",")} mm
-              </option>
-            ))}
-            <option value="off">sin ajuste</option>
-          </select>
-        </label>
-        <div className="seg" role="group" aria-label="Historial y vista">
-          <button type="button" disabled={!canUndo} onClick={() => useAppStore.getState().undoPlan()} title="Deshacer (Ctrl+Z)">
-            Deshacer
-          </button>
-          <button type="button" disabled={!canRedo} onClick={() => useAppStore.getState().redoPlan()} title="Rehacer (Ctrl+Y)">
-            Rehacer
-          </button>
-          <button type="button" onClick={fit} title="Encuadrar (F)">
-            Encuadrar
-          </button>
-        </div>
-      </div>
+  const uName = AXIS_NAMES[spec.u];
+  const vName = AXIS_NAMES[spec.v];
 
+  return (
+    <div className={`plan-editor plane-${plane}${active && !exclusive ? " active" : ""}${compact ? " compact" : ""}`}>
       <div className="plan-canvas-wrap" ref={wrapRef} data-tour="plan-canvas">
         <svg
           ref={svgRef}
@@ -894,7 +933,7 @@ export function PlanformEditor() {
           onDoubleClick={onDoubleClick}
           onContextMenu={(e) => e.preventDefault()}
           role="application"
-          aria-label="Plano cartesiano de la planta, vista desde arriba con el morro hacia arriba"
+          aria-label={`Plano cartesiano del ${spec.label.toLowerCase()}: el dron visto ${spec.seenFrom}`}
         >
           <defs>
             <pattern id="plan-hatch" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
@@ -910,11 +949,16 @@ export function PlanformEditor() {
               <path d={grid.majorPath} className="grid-major" />
               <line x1={r1(origin[0])} y1={0} x2={r1(origin[0])} y2={size.h} className="axis" />
               <line x1={0} y1={r1(origin[1])} x2={size.w} y2={r1(origin[1])} className="axis" />
-              <text x={r1(origin[0] + 6)} y={16} className="plan-text axis-label">
-                x · adelante ↑
+              <text x={r1(origin[0] + 6)} y={axes.verticalAtTop ? 16 : size.h - 22} className="plan-text axis-label">
+                {axes.vertical}
               </text>
-              <text x={size.w - 8} y={r1(origin[1] - 6)} textAnchor="end" className="plan-text axis-label">
-                y · derecha →
+              <text
+                x={axes.horizontalAtRight ? size.w - 8 : 44}
+                y={r1(origin[1] - 6)}
+                textAnchor={axes.horizontalAtRight ? "end" : "start"}
+                className="plan-text axis-label"
+              >
+                {axes.horizontal}
               </text>
               {grid.vLabels.filter((l) => l.pos > 36 && l.pos < size.w - 16).map((l) => (
                 <text key={`v${l.value}`} x={l.pos} y={size.h - 6} textAnchor="middle" className="plan-text ruler">
@@ -930,9 +974,25 @@ export function PlanformEditor() {
           )}
           {view !== null && (
             <>
-              <g className="plan-elements">
-                {ordered.flatMap((element) => elementOutlines(element).map((o) => shapeFor(element, o.mirrored, o.ring)))}
+              <g className="plan-ghosts">
+                {parts.rings.map((g) => (
+                  <polygon
+                    key={g.key}
+                    points={pts(cam, g.ring)}
+                    className={`plan-ghost part${g.partId === useAppStore.getState().partSelectedId ? " selected" : ""}`}
+                    data-part={g.partId}
+                  />
+                ))}
+                {ghosts.map((g) => (
+                  <polygon
+                    key={g.key}
+                    points={pts(cam, g.ring)}
+                    className={`plan-ghost ${g.role}${g.elementId === selectedId ? " selected" : ""}`}
+                    data-silhouette={g.elementId}
+                  />
+                ))}
               </g>
+              <g className="plan-elements">{ordered.flatMap((element) => outlinesOf(element).map((o) => shapeFor(element, o.mirrored, o.ring)))}</g>
               {dimensions}
               {selectionOverlay}
               {draftOverlay}
@@ -940,20 +1000,21 @@ export function PlanformEditor() {
             </>
           )}
         </svg>
-        {planform.elements.length === 0 && draft.length === 0 && (
-          <p className="plan-empty">
-            Planta vacía. Dibuja con «Contorno», «Rectángulo» o «Círculo», o parte de una plantilla del panel izquierdo.
-          </p>
+        <span className="plan-view-name" aria-hidden="true">
+          {spec.label} <small>{spec.seenFrom}</small>
+        </span>
+        {own.length === 0 && draft.length === 0 && (
+          <p className={`plan-empty${ghosts.length > 0 || parts.rings.length > 0 ? " low" : ""}`}>{EMPTY_TEXT[plane]}</p>
         )}
       </div>
       <div className="plan-status" data-tour="plan-status">
         <span className="num">
-          {cursor === null ? "x — · y —" : `x ${mm1(cursor.point[0])} mm · y ${mm1(cursor.point[1])} mm`}
+          {cursor === null ? `${uName} — · ${vName} —` : `${uName} ${mm1(cursor.point[0])} mm · ${vName} ${mm1(cursor.point[1])} mm`}
         </span>
         {cursor !== null && SNAP_NAMES[cursor.kind] !== "" && <span className="snap">{SNAP_NAMES[cursor.kind]}</span>}
-        <span className="hint-text">{HINTS[tool]}</span>
+        {notice !== null && <span className="notice">{notice}</span>}
+        {!compact && <span className="hint-text">{HINTS[tool]}</span>}
       </div>
     </div>
   );
 }
-

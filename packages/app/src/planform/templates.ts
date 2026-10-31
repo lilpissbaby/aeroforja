@@ -8,7 +8,7 @@
  */
 import { meters } from "@aeroforja/physics";
 import {
-  planPoint,
+  planePoint,
   roundMicro,
   uniqueElementId,
   type CircleElement,
@@ -65,6 +65,11 @@ export interface WingParams {
   readonly thickness: number;
   /** Mid-plane body z, m. */
   readonly z: number;
+  /**
+   * Height of a vertical fin at each tip, m; zero for none. Drawn in the
+   * perfil, at the tip, ending at the tip trailing edge.
+   */
+  readonly finHeight: number;
 }
 
 export interface WingPreset {
@@ -79,17 +84,17 @@ export const WING_PRESETS: readonly WingPreset[] = [
   {
     id: "flying-wing-800",
     label: "Ala volante de 800 mm",
-    params: { span: 0.8, rootChord: 0.25, tipChord: 0.15, sweep: deg(25), rootLeadingEdgeX: 0.125, thickness: 0.003, z: 0 },
+    params: { span: 0.8, rootChord: 0.25, tipChord: 0.15, sweep: deg(25), rootLeadingEdgeX: 0.125, thickness: 0.003, z: 0, finHeight: 0.08 },
   },
   {
     id: "delta-800",
     label: "Delta de 800 mm",
-    params: { span: 0.8, rootChord: 0.45, tipChord: 0, sweep: deg(48.4), rootLeadingEdgeX: 0.25, thickness: 0.003, z: 0 },
+    params: { span: 0.8, rootChord: 0.45, tipChord: 0, sweep: deg(48.4), rootLeadingEdgeX: 0.25, thickness: 0.003, z: 0, finHeight: 0 },
   },
   {
     id: "straight-1000",
     label: "Ala recta de 1000 mm",
-    params: { span: 1, rootChord: 0.18, tipChord: 0.18, sweep: 0, rootLeadingEdgeX: 0.045, thickness: 0.003, z: 0 },
+    params: { span: 1, rootChord: 0.18, tipChord: 0.18, sweep: 0, rootLeadingEdgeX: 0.045, thickness: 0.003, z: 0, finHeight: 0 },
   },
 ];
 
@@ -101,7 +106,7 @@ export function armAngles(arms: number, layout: "x" | "plus"): number[] {
   return Array.from({ length: arms }, (_, i) => (layout === "plus" ? i * step : (i + 0.5) * step));
 }
 
-const p = (x: number, y: number) => planPoint(roundMicro(x), roundMicro(y));
+const p = (x: number, y: number) => planePoint(roundMicro(x), roundMicro(y));
 
 /**
  * Elements of a multirotor frame. Arms and rotors on the right side carry the
@@ -118,9 +123,10 @@ export function frameElements(params: FrameParams, existing: Planform): Planform
     name: "Placa central",
     role: "plate",
     shape: "polygon",
+    plane: "top",
     mirror: false,
     thickness: t,
-    z: zero,
+    offset: zero,
     points: [p(half, -half), p(half, half), p(-half, half), p(-half, -half)],
   });
 
@@ -139,9 +145,10 @@ export function frameElements(params: FrameParams, existing: Planform): Planform
       name: onAxis ? `Brazo ${index}` : `Brazo ${index} (y su reflejo)`,
       role: "plate",
       shape: "polygon",
+      plane: "top",
       mirror: !onAxis,
       thickness: t,
-      z: zero,
+      offset: zero,
       points: [p(-s * w, c * w), p(r * c - s * w, r * s + c * w), p(r * c + s * w, r * s - c * w), p(s * w, -c * w)],
     };
     out.push(arm);
@@ -151,9 +158,10 @@ export function frameElements(params: FrameParams, existing: Planform): Planform
       name: onAxis ? `Bancada ${index}` : `Bancada ${index} (y su reflejo)`,
       role: "plate",
       shape: "circle",
+      plane: "top",
       mirror: !onAxis,
       thickness: t,
-      z: zero,
+      offset: zero,
       center,
       radius: meters(params.mountDiameter / 2),
     };
@@ -163,9 +171,10 @@ export function frameElements(params: FrameParams, existing: Planform): Planform
       name: onAxis ? `Hélice ${index}` : `Hélice ${index}`,
       role: "rotor",
       shape: "circle",
+      plane: "top",
       mirror: !onAxis,
       thickness: t,
-      z: meters(roundMicro(-params.propHeight)),
+      offset: meters(roundMicro(-params.propHeight)),
       center,
       radius: meters(params.propDiameter / 2),
     };
@@ -187,11 +196,46 @@ export function wingElement(params: WingParams, existing: Planform): PolygonElem
     name: "Ala",
     role: "wing",
     shape: "polygon",
+    plane: "top",
     mirror: true,
     thickness: meters(params.thickness),
-    z: meters(params.z),
+    offset: meters(params.z),
     points,
   };
+}
+
+/**
+ * Tip fins (winglets) of a wing template: one perfil element at the right
+ * tip, mirrored to the left. Chord along the tip, leading edge swept back by
+ * 40 % of the chord at the top, standing up (negative z) from the wing.
+ */
+export function wingFinElement(params: WingParams, existing: Planform): PolygonElement | null {
+  if (!(params.finHeight > 0)) return null;
+  const semi = params.span / 2;
+  const tipLe = params.rootLeadingEdgeX - semi * Math.tan(params.sweep);
+  const chord = Math.max(params.tipChord, 0.25 * params.rootChord);
+  const rear = tipLe - Math.max(params.tipChord, 0);
+  const front = rear + chord;
+  const top = params.z - params.thickness / 2 - params.finHeight;
+  const base = params.z - params.thickness / 2;
+  return {
+    id: uniqueElementId(existing, "deriva"),
+    name: "Deriva de punta",
+    role: "wing",
+    shape: "polygon",
+    plane: "side",
+    mirror: true,
+    thickness: meters(params.thickness),
+    offset: meters(roundMicro(semi - params.thickness / 2)),
+    points: [p(front, base), p(rear, base), p(rear, top), p(rear + 0.6 * chord, top)],
+  };
+}
+
+/** Wing and, when asked for, its tip fins. */
+export function wingElements(params: WingParams, existing: Planform): PlanformElement[] {
+  const wing = wingElement(params, existing);
+  const fin = wingFinElement(params, { elements: [...existing.elements, wing] });
+  return fin === null ? [wing] : [wing, fin];
 }
 
 /** Problems with the template inputs, in the builder's words; empty when they can be built. */
@@ -216,5 +260,6 @@ export function wingParamsProblems(params: WingParams): string[] {
   if (!(params.tipChord >= 0)) problems.push("La cuerda en la punta no puede ser negativa.");
   if (!(params.thickness > 0)) problems.push("El espesor tiene que ser mayor que cero.");
   if (!(Math.abs(params.sweep) < deg(80))) problems.push("La flecha tiene que estar entre −80° y 80°.");
+  if (!(params.finHeight >= 0)) problems.push("La altura de las derivas no puede ser negativa.");
   return problems;
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { meters } from "@aeroforja/physics";
-import { elementArea, elementBounds, elementPerimeter } from "../../planform/geometry.ts";
-import { ROLE_LABELS, ROLES, planPoint, type PlanformElement, type PlanformRole } from "../../planform/model.ts";
+import { elementArea, elementBounds, elementPerimeter, isOnSymmetryPlane } from "../../planform/geometry.ts";
+import { ROLE_LABELS, ROLES, planePoint, type PlanformElement, type PlanformRole } from "../../planform/model.ts";
+import { AXIS_NAMES, OFFSET_LABEL, PLANE_SPECS, type PlaneId } from "../../planform/planes.ts";
 import { mm1 } from "../../planform/view.ts";
 import { useAppStore } from "../../state/store.ts";
 import { formatFixed, fromMillimeters, toMillimeters } from "../../units/display.ts";
@@ -10,6 +11,14 @@ import { IssueBadge, ProvenanceTag } from "../ResultMeta.tsx";
 import { usePlanformAnalysis } from "./usePlanformAnalysis.ts";
 
 const INCH = 0.0254;
+
+const AXIS_WORDS = ["x (adelante)", "y (derecha)", "z (abajo)"] as const;
+
+/** Names of the in-plane coordinates of a view: planta x, y; perfil x, z; alzado y, z. */
+function planeAxes(plane: PlaneId): { u: string; v: string; uWord: string; vWord: string } {
+  const s = PLANE_SPECS[plane];
+  return { u: AXIS_NAMES[s.u], v: AXIS_NAMES[s.v], uWord: AXIS_WORDS[s.u], vWord: AXIS_WORDS[s.v] };
+}
 
 /** Text input that commits on blur or Enter, so each rename is one undo step. */
 function NameField({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
@@ -69,7 +78,8 @@ function Value({ label, value, unit }: { label: string; value: string; unit: str
 function Geometry({ element }: { element: PlanformElement }) {
   const own = { ...element, mirror: false };
   const b = elementBounds(own);
-  const copies = element.mirror && !(element.shape === "circle" && Math.abs(element.center.y) < 1e-6) ? 2 : 1;
+  const copies = element.mirror && !isOnSymmetryPlane(element) ? 2 : 1;
+  const axes = planeAxes(element.plane);
   const area = elementArea(element);
   return (
     <section className="panel-section" data-tour="geometry">
@@ -77,8 +87,8 @@ function Geometry({ element }: { element: PlanformElement }) {
         Geometría <ProvenanceTag provenance="CALCULATED" />
       </h3>
       <dl className="values">
-        <Value label="Largo en x" value={mm1(b.maxX - b.minX)} unit="mm" />
-        <Value label="Ancho en y" value={mm1(b.maxY - b.minY)} unit="mm" />
+        <Value label={`Medida en ${axes.u}`} value={mm1(b.maxX - b.minX)} unit="mm" />
+        <Value label={`Medida en ${axes.v}`} value={mm1(b.maxY - b.minY)} unit="mm" />
         <Value label="Área" value={formatFixed(area * 1e4, 2)} unit="cm²" />
         {copies === 2 && <Value label="Con su reflejo" value={formatFixed(2 * area * 1e4, 2)} unit="cm²" />}
         <Value label="Perímetro" value={mm1(elementPerimeter(element))} unit="mm" />
@@ -88,7 +98,7 @@ function Geometry({ element }: { element: PlanformElement }) {
       </dl>
       <p className="hint">
         Área por la fórmula de Gauss del contorno dibujado (círculos: π r²). Antes de fundirse con las piezas que toca y de
-        restar vaciados; el total está en la pestaña Planta de abajo.
+        restar vaciados; el total está en la pestaña Dibujo de abajo.
       </p>
     </section>
   );
@@ -96,10 +106,11 @@ function Geometry({ element }: { element: PlanformElement }) {
 
 function Vertices({ element }: { element: Extract<PlanformElement, { shape: "polygon" }> }) {
   const update = useAppStore((s) => s.updatePlanElement);
-  const setPoint = (index: number, axis: "x" | "y", value: number) =>
+  const axes = planeAxes(element.plane);
+  const setPoint = (index: number, axis: "u" | "v", value: number) =>
     update(element.id, (e) =>
       e.shape === "polygon"
-        ? { ...e, points: e.points.map((p, i) => (i === index ? planPoint(axis === "x" ? value : p.x, axis === "y" ? value : p.y) : p)) }
+        ? { ...e, points: e.points.map((p, i) => (i === index ? planePoint(axis === "u" ? value : p.u, axis === "v" ? value : p.v) : p)) }
         : e,
     );
   return (
@@ -109,8 +120,8 @@ function Vertices({ element }: { element: Extract<PlanformElement, { shape: "pol
         <thead>
           <tr>
             <th scope="col">#</th>
-            <th scope="col">x (adelante)</th>
-            <th scope="col">y (derecha)</th>
+            <th scope="col">{axes.uWord}</th>
+            <th scope="col">{axes.vWord}</th>
             <th scope="col">
               <span className="visually-hidden">Quitar</span>
             </th>
@@ -121,10 +132,10 @@ function Vertices({ element }: { element: Extract<PlanformElement, { shape: "pol
             <tr key={i}>
               <td className="num">{i + 1}</td>
               <td>
-                <Mm label={`x del vértice ${i + 1}`} hideLabel value={p.x} onCommit={(v) => setPoint(i, "x", v)} />
+                <Mm label={`${axes.u} del vértice ${i + 1}`} hideLabel value={p.u} onCommit={(v) => setPoint(i, "u", v)} />
               </td>
               <td>
-                <Mm label={`y del vértice ${i + 1}`} hideLabel value={p.y} onCommit={(v) => setPoint(i, "y", v)} />
+                <Mm label={`${axes.v} del vértice ${i + 1}`} hideLabel value={p.v} onCommit={(v) => setPoint(i, "v", v)} />
               </td>
               <td>
                 <button
@@ -164,8 +175,9 @@ export function PlanformProperties() {
         <section className="panel-section">
           <h2>Propiedades</h2>
           <p className="hint">
-            Elige un elemento en la lista, en el plano o en el visor 3D. El plano es la vista desde arriba con el morro hacia
-            arriba: x adelante, y a la derecha, en milímetros.
+            Elige un elemento en la lista, en cualquiera de las tres vistas o en el visor 3D. Planta: desde arriba, morro hacia
+            arriba (x, y). Perfil: desde la derecha, morro a la derecha (x, z). Alzado: desde delante (y, z). En milímetros,
+            ejes FRD: x adelante, y derecha, z abajo.
           </p>
         </section>
         <section className="panel-section">
@@ -176,13 +188,14 @@ export function PlanformProperties() {
             value={referencePoint}
             onChange={(e) => setReferencePoint(e.target.value)}
           />
-          <p className="hint">La planta y el modelo de masas comparten este origen y los ejes FRD (z hacia abajo).</p>
+          <p className="hint">El dibujo, las piezas STL y el modelo de masas comparten este origen y los ejes FRD (z hacia abajo).</p>
         </section>
         <section className="panel-section">
           <h3>Del plano al 3D</h3>
           <p className="hint">
-            Las placas y alas se extruyen con su espesor centrado en su altura z. Las que comparten altura y espesor se funden
-            en una sola pieza; los vaciados recortan las capas que atraviesan. Los discos de hélice son planos sin espesor.
+            Cada placa o ala se extruye perpendicular a su vista, con el espesor centrado en su plano medio. Las de la misma
+            vista, plano medio y espesor se funden en una sola pieza; los vaciados recortan las capas de su vista que atraviesan.
+            Los discos de hélice son planos sin espesor.
           </p>
         </section>
       </aside>
@@ -192,13 +205,20 @@ export function PlanformProperties() {
   const set = (fn: (e: PlanformElement) => PlanformElement) => update(element.id, fn);
   const issues = analysis.issues.filter((i) => i.elementId === element.id);
   const solid = element.role === "plate" || element.role === "wing";
-  const roles = element.shape === "circle" ? ROLES : ROLES.filter((r) => r !== "rotor");
+  const roles = element.shape === "circle" && element.plane !== "side" ? ROLES : ROLES.filter((r) => r !== "rotor");
+  const axes = planeAxes(element.plane);
+  const offsetAxis = AXIS_NAMES[PLANE_SPECS[element.plane].n];
+  const offsetLabel =
+    element.role === "rotor" ? (element.plane === "front" ? "x del disco (+ adelante)" : "z del disco (+ abajo)") : OFFSET_LABEL[element.plane];
 
   return (
     <aside className="right" aria-label="Propiedades" data-tour="properties">
       <section className="panel-section">
         <h2>Propiedades</h2>
         <NameField value={element.name} onCommit={(name) => set((e) => ({ ...e, name }))} />
+        <p className="hint">
+          Dibujado en el <b>{PLANE_SPECS[element.plane].label.toLowerCase()}</b> ({axes.u}, {axes.v}), visto {PLANE_SPECS[element.plane].seenFrom}.
+        </p>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="plan-role">Tipo</label>
@@ -212,7 +232,7 @@ export function PlanformProperties() {
           </div>
           <label className="inline check standalone">
             <input type="checkbox" checked={element.mirror} onChange={(e) => set((el) => ({ ...el, mirror: e.target.checked }))} />
-            <span>Simétrico (reflejo en y)</span>
+            <span>Simétrico (reflejo en y = 0)</span>
           </label>
         </div>
         {issues.map((i) => (
@@ -223,21 +243,21 @@ export function PlanformProperties() {
       </section>
 
       <section className="panel-section">
-        <h3>Altura y espesor</h3>
+        <h3>Posición del plano y espesor</h3>
         <div className="grid-2">
-          <Mm
-            label={element.role === "rotor" ? "z del disco (+ abajo)" : "z del plano medio (+ abajo)"}
-            value={element.z}
-            onCommit={(v) => set((e) => ({ ...e, z: meters(v) }))}
-          />
+          <Mm label={offsetLabel} value={element.offset} onCommit={(v) => set((e) => ({ ...e, offset: meters(v) }))} />
           {solid && <Mm label="Espesor" value={element.thickness} positive onCommit={(v) => set((e) => ({ ...e, thickness: meters(v) }))} />}
         </div>
         <p className="hint">
           {element.role === "hole"
-            ? "El vaciado recorta las placas y alas cuyo espesor contiene esta altura."
+            ? `El vaciado recorta las placas y alas de su vista cuyo espesor contiene este ${offsetAxis}.`
             : element.role === "rotor"
-              ? "Plano de giro de la hélice. Negativo: por encima de las placas (z apunta hacia abajo)."
-              : "Piezas con la misma z y el mismo espesor forman una sola plancha."}
+              ? element.plane === "front"
+                ? "Plano de giro de una hélice tractora (delante, x positiva) o propulsora (detrás)."
+                : "Plano de giro de la hélice. Negativo: por encima de las placas (z apunta hacia abajo)."
+              : element.plane === "side"
+                ? `Deriva o pieza vertical: ${offsetAxis} es su distancia al plano de simetría; con simetría se crea la pareja al otro lado.`
+                : `Piezas de la misma vista con el mismo ${offsetAxis} y espesor forman una sola plancha.`}
         </p>
       </section>
 
@@ -245,8 +265,8 @@ export function PlanformProperties() {
         <section className="panel-section">
           <h3>Círculo</h3>
           <div className="grid-2">
-            <Mm label="Centro x" value={element.center.x} onCommit={(v) => set((e) => (e.shape === "circle" ? { ...e, center: planPoint(v, e.center.y) } : e))} />
-            <Mm label="Centro y" value={element.center.y} onCommit={(v) => set((e) => (e.shape === "circle" ? { ...e, center: planPoint(e.center.x, v) } : e))} />
+            <Mm label={`Centro ${axes.u}`} value={element.center.u} onCommit={(v) => set((e) => (e.shape === "circle" ? { ...e, center: planePoint(v, e.center.v) } : e))} />
+            <Mm label={`Centro ${axes.v}`} value={element.center.v} onCommit={(v) => set((e) => (e.shape === "circle" ? { ...e, center: planePoint(e.center.u, v) } : e))} />
             <Mm
               label="Diámetro"
               value={element.radius * 2}

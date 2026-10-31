@@ -14,6 +14,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/app/package.json packages/app/
 COPY packages/physics/package.json packages/physics/
 COPY packages/validation/package.json packages/validation/
+COPY packages/mcp/package.json packages/mcp/
 RUN pnpm install --frozen-lockfile
 
 COPY . .

@@ -1,14 +1,15 @@
 /**
- * 3D model of the planform: each sheet's pieces extruded to their thickness.
+ * 3D model of the drawing: each sheet's pieces extruded to their thickness.
  *
- * Geometry is built directly in body axes FRD (metres): the plan (x, y) is
- * the extrusion profile and the extrusion runs along +z (down) from the top
- * face z − t/2 to the bottom face z + t/2. The viewer rotates the whole group
- * from FRD to three.js axes; the STL export rotates it to the Z-up axes that
- * slicers expect. Both are proper rotations, so faces keep their orientation.
+ * Each sheet is extruded in its plane's local coordinates (u, v, w), from
+ * w = s·offset − t/2 to s·offset + t/2 (s = ±1, see planes.ts), and then
+ * rotated into body axes FRD (metres) by a proper rotation, so faces keep
+ * pointing outwards. The viewer rotates the result from FRD to three.js
+ * axes; the STL export rotates it to the Z-up axes that slicers expect.
  */
 import * as THREE from "three";
 import type { PolygonWithHoles, SolidLayer } from "./geometry.ts";
+import { PLANE_SPECS, localToBody } from "./planes.ts";
 
 function toShape(polygon: PolygonWithHoles): THREE.Shape {
   const [outer, ...holes] = polygon;
@@ -19,6 +20,9 @@ function toShape(polygon: PolygonWithHoles): THREE.Shape {
 
 /** One closed solid per piece of the sheet, in FRD metres. */
 export function layerGeometries(layer: SolidLayer): THREE.BufferGeometry[] {
+  const spec = PLANE_SPECS[layer.plane];
+  const r = localToBody(layer.plane);
+  const toBody = new THREE.Matrix4().set(r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, 0, 0, 0, 1);
   return layer.bodies.map((polygon) => {
     const geometry = new THREE.ExtrudeGeometry(toShape(polygon), {
       depth: layer.thickness,
@@ -26,7 +30,8 @@ export function layerGeometries(layer: SolidLayer): THREE.BufferGeometry[] {
       steps: 1,
       curveSegments: 1,
     });
-    geometry.translate(0, 0, layer.z - layer.thickness / 2);
+    geometry.translate(0, 0, spec.wSign * layer.offset - layer.thickness / 2);
+    geometry.applyMatrix4(toBody);
     geometry.computeVertexNormals();
     return geometry;
   });

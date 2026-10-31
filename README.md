@@ -12,6 +12,9 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 - Entrega 3: la app web con el visor 3D básico (modelo de masas editable, CG, ejes, aire), con la física en un Web Worker.
 - Entrega 4: editor de planta en un plano cartesiano (mm, morro arriba) que genera el modelo 3D al momento, con exportación STL y SVG 1:1; despliegue con Docker en local y en el VPS.
 - Entrega 5: tour guiado dentro de la app y esta guía ilustrada.
+- Entrega 6: dibujo en **tres vistas** (planta, perfil y alzado), **túnel de viento virtual** (VLM + resistencia por componentes, punto neutro y margen estático), **piezas STL** montadas en el dron con su masa e inercia exactas, **diseño con Claude Desktop** por MCP e integración continua.
+
+![Tests](https://github.com/lilpissbaby/aeroforja/actions/workflows/ci.yml/badge.svg)
 
 ## Índice
 
@@ -20,7 +23,7 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 - [La pantalla de un vistazo](#la-pantalla-de-un-vistazo)
 - [1. Barra superior](#1-barra-superior)
 - [2. Panel izquierdo: elementos, plantillas y proyecto](#2-panel-izquierdo-elementos-plantillas-y-proyecto)
-- [3. Las tres vistas](#3-las-tres-vistas)
+- [3. Las vistas: planta, perfil, alzado y 3D](#3-las-vistas-planta-perfil-alzado-y-3d)
 - [4. El editor de planta](#4-el-editor-de-planta)
 - [5. Panel de propiedades](#5-panel-de-propiedades)
 - [6. Del plano al modelo 3D](#6-del-plano-al-modelo-3d)
@@ -28,6 +31,10 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 - [8. Modelo de masas](#8-modelo-de-masas)
 - [9. Archivos para el taller](#9-archivos-para-el-taller)
 - [10. Tema oscuro y móvil](#10-tema-oscuro-y-móvil)
+- [11. Túnel de viento virtual](#11-túnel-de-viento-virtual)
+- [12. Piezas STL](#12-piezas-stl)
+- [13. Diseñar con Claude Desktop](#13-diseñar-con-claude-desktop)
+- [Calidad: validación y pruebas](#calidad-validación-y-pruebas)
 - [Atajos de teclado y ratón](#atajos-de-teclado-y-ratón)
 - [Despliegue](#despliegue)
 - [Para desarrollar](#para-desarrollar)
@@ -123,11 +130,11 @@ Todo se guarda solo en el navegador mientras trabajas.
 
 <img src="docs/img/06-panel-planta.png" alt="Lista de elementos de la planta del quad de ejemplo" width="250" align="right">
 
-En la pestaña **Planta** cada línea es un elemento del dibujo:
+En la pestaña **Dibujo** cada línea es un elemento, de cualquiera de las tres vistas:
 
 - su **nombre**;
 - su **tipo**: placa, ala, vaciado o hélice;
-- **×2** si es simétrico (existe también su reflejo al otro lado del eje x);
+- **×2** si es simétrico (existe también su reflejo respecto a y = 0) y la **vista** donde está dibujado;
 - sus **medidas**: largo × ancho y número de vértices, o el diámetro en mm de un círculo (en una hélice también en pulgadas).
 
 Un clic lo selecciona en el plano, en el 3D y en el panel de propiedades. Si un elemento tiene un error que impide construirlo, aparece un punto rojo delante de su nombre.
@@ -198,23 +205,45 @@ Delta de 800 mm:
 
 ---
 
-## 3. Las tres vistas
+## 3. Las vistas: planta, perfil, alzado y 3D
 
-Arriba del centro eliges **Planta**, **Planta + 3D** o **3D**. En «Planta + 3D» las dos vistas van sincronizadas: lo que dibujas aparece en 3D al instante y lo que seleccionas en una se selecciona en la otra.
+Arriba del centro eliges la vista:
+
+| Pestaña | Qué muestra |
+|---|---|
+| **Planta** | El dron desde arriba, morro arriba: x adelante, y a la derecha |
+| **Perfil** | Desde la derecha, morro a la derecha: x adelante, z abajo. Aquí van las derivas, el fuselaje visto de lado y los trenes |
+| **Alzado** | Desde delante: y a la derecha (a tu izquierda, como en un plano de verdad), z abajo. Aquí van las cuadernas y las hélices tractoras o propulsoras |
+| **Tres vistas + 3D** | Planta, perfil y alzado juntos con el modelo 3D, como un plano de tres vistas |
+| **Planta + 3D** | La planta junto al modelo |
+| **3D** | Solo el modelo |
+| **Túnel de viento** | El ensayo virtual (sección 11) |
+
+![Las tres vistas y el 3D de un ala volante con derivas de punta](docs/img/50-tres-vistas.png)
+
+Todo va sincronizado: lo que dibujas en una vista aparece en las otras y en 3D al instante, y lo que seleccionas en una se selecciona en todas. **Cada vista muestra en discontinuo lo dibujado en las otras dos**, y el cursor se engancha a sus esquinas, así que alinear una deriva con el borde de salida del ala es cuestión de un clic. Puedes elegir una silueta discontinua para seleccionar ese elemento; se edita en su propia vista.
+
+| Perfil: deriva de punta seleccionada | Alzado: hélice propulsora detrás del ala |
+|---|---|
+| ![Perfil con la deriva seleccionada](docs/img/51-perfil-deriva.png) | ![Alzado con una hélice propulsora](docs/img/52-alzado-helice.png) |
+
+Cada elemento vive en una vista y se extruye perpendicular a ella con su espesor, centrado en su **plano medio**: z en la planta, y en el perfil, x en el alzado. Con **Simetría**, en la planta y el alzado se crea el reflejo respecto a y = 0; en el perfil, la pareja al otro lado (dos derivas).
 
 | Solo planta | Solo 3D |
 |---|---|
 | ![Vista solo planta de una delta](docs/img/12-vista-planta.png) | ![Vista solo 3D de una delta](docs/img/13-vista-3d.png) |
 
-Al aplicar una plantilla o al abrir un archivo, las dos vistas se encuadran solas. El 3D se reencuadra también al pasar entre «Planta + 3D» y «3D», y cuando el dibujo crece o encoge mucho (por ejemplo, el primer contorno sobre un plano vacío). Los cambios pequeños no te mueven la cámara; para encuadrar a mano, «Encuadrar» en cada vista.
+Al aplicar una plantilla o al abrir un archivo, todas las vistas se encuadran solas. El 3D se reencuadra también al cambiar de vista y cuando el dibujo crece o encoge mucho. Los cambios pequeños no te mueven la cámara; para encuadrar a mano, «Encuadrar».
 
 ---
 
 ## 4. El editor de planta
 
+Lo que sigue vale para las tres vistas; cambian los ejes, rotulados en cada una. Con «Tres vistas + 3D», el teclado va a la última vista en la que has trabajado (la barra lo indica: «Teclado en: Planta»).
+
 ### El plano cartesiano
 
-El dron se ve **desde arriba con el morro hacia arriba**, en milímetros:
+En la planta el dron se ve **desde arriba con el morro hacia arriba**, en milímetros:
 
 - **x adelante**, en vertical hacia arriba;
 - **y a la derecha**, en horizontal.
@@ -383,7 +412,7 @@ En la captura: placa inferior de 3 mm con aligerados (capa a z = 0) y placa supe
 | Deseleccionar | Clic en el fondo |
 
 Opciones de arriba:
-- **Planta en 3D**: el modelo del dibujo.
+- **Dibujo y piezas STL**: el modelo del dibujo y las piezas importadas.
 - **Piezas de masa y CG**: los bloques del modelo de masas, el símbolo del **centro de gravedad** y los **ejes principales de inercia** (discontinuos).
 - **Encuadrar**: centra la cámara en todo lo visible.
 - **Descargar STL** y **Descargar SVG 1:1**: ver [archivos para el taller](#9-archivos-para-el-taller).
@@ -497,6 +526,74 @@ En pantallas estrechas los paneles se apilan: plano, 3D, panel izquierdo, propie
 
 ---
 
+## 11. Túnel de viento virtual
+
+Ensaya el diseño tal como está dibujado y pesado: un barrido de ángulo de ataque a la velocidad y con el aire de la barra superior.
+
+![Túnel de viento: curvas de sustentación, momento, polar y eficiencia de un ala volante, con el semáforo de validez](docs/img/53-tunel.png)
+
+**Qué calcula y cómo** (mini-diseño [004](docs/design/004-tunel-de-barridos.md)):
+
+- **Sustentación y momentos**: red de vórtices en herradura (VLM, Katz y Plotkin) sobre los elementos de tipo **Ala** de la planta (horizontales) y del perfil (derivas). Fuerzas por Kutta–Joukowski en cada panel y momentos respecto al CG del modelo de masas. **CALCULADO.**
+- **Resistencia inducida**: plano de Trefftz (Drela). **CALCULADO.**
+- **Resistencia parásita**: suma por componentes (Raymer 12.5): fricción de placa plana (Blasius / Prandtl–Schlichting) con factor de forma de perfil delgado, cantos romos de las placas, placas del alzado de cara al flujo, bloques del modelo de masas y piezas STL con el Cd de su forma (NASA Glenn). **ESTIMADO**, con la banda de ±40 % de los cuerpos romos.
+- **Punto neutro y margen estático** con el CG real: el veredicto «Estable / Inestable en cabeceo» sale de aquí.
+
+**Qué ves**: CLα, CL₀, CD₀ con su banda, e de Oswald, L/D máximo, punto neutro en mm y en % de la cuerda media aerodinámica, CG en % de la CMA; curvas CL–α, Cm–α, polar CD–CL y L/D–α; la carga a lo largo de la envergadura frente a la elíptica; el **mapa de ΔCp** de cada panel; la **balanza de seis componentes** (Fx, Fy, Fz, L, M, N respecto al CG) en el α que elijas; y la resistencia de cada componente con su Reynolds y su Cf. Todo se descarga en CSV.
+
+| Balanza, carga en envergadura y resistencia por componentes | Resultado y validez |
+|---|---|
+| ![Balanza de seis componentes y tabla de resistencia](docs/img/54-tunel-balanza.png) | ![Resumen del ensayo con el veredicto de estabilidad](docs/img/55-tunel-resultado.png) |
+
+**El semáforo de α**: hasta 5° verde (zona lineal validada), de 5° a 10° ámbar, más de 10° rojo: una placa plana ha entrado en pérdida y el método no la modela. Los puntos y las bandas de las gráficas lo muestran, y el resumen (pendiente, punto neutro, Oswald) se ajusta solo con |α| ≤ 5°.
+
+**Validación**: la implementación reproduce exactamente el ejemplo resuelto 7.2 de Bertin y Cummings (CL = 0,0601 α por grado) y se compara con Helmbold, la línea sustentadora y DATCOM; tolerancias y desviaciones, en el mini-diseño 004. Un multirrotor sin ala da fuerzas en N y área de resistencia D/q en lugar de coeficientes.
+
+**Lo que no hace todavía**: perfiles con espesor y curvatura, torsión y diedro, superficies de mando, derivadas en β, p, q, r, estela de las hélices y CFD. Para la resistencia real, nada sustituye a un ensayo: el valor queda ámbar hasta calibrarlo.
+
+---
+
+## 12. Piezas STL
+
+En la pestaña **Piezas** del panel izquierdo importas un STL (binario o de texto; unidades mm, cm, pulgadas o m) y lo colocas en el dron con posición, giro (guiñada, cabeceo, alabeo) y escala. Aparece en las tres vistas (silueta azul) y en 3D.
+
+![Una montura de cámara importada en STL, colocada en el morro y vista en las tres vistas y en 3D](docs/img/56-pieza-stl.png)
+
+- **Malla**: la app comprueba que está cerrada y bien orientada (cada arista compartida por dos triángulos en sentidos opuestos). Si no, lo dice y no calcula volumen ni masa.
+- **Masa**: volumen, centroide e inercia exactos de la malla por tetraedros con signo (Mirtich 1996, Tonon 2004; mini-diseño [005](docs/design/005-piezas-stl.md)). La masa sale de **pesarla** (MEDIDA, lo mejor) o de **volumen × densidad** de tu ficha (CALCULADA o ESTIMADA). La app **no supone ninguna densidad**: hasta que des una, la pieza no cuenta en el modelo de masas. Con «Cuenta en el modelo de masas», su masa, CG e inercia entran en el CG total, la inercia y el túnel.
+- **Resistencia**: eliges la forma (cara plana, cuerpo con morro, esfera o cúpula, morro de bala, carenado) y el túnel usa su Cd por el área frontal real de la pieza colocada (unión de sus triángulos proyectados). Siempre ESTIMADA, ±40 %.
+- **STL colocado**: descarga la pieza ya colocada en ejes del dron, en mm, para comprobarla en el laminador.
+
+![Propiedades de la pieza: colocación, masa pesada y lo que da la malla](docs/img/57-pieza-propiedades.png)
+
+El JSON del proyecto lleva las mallas dentro, así que el proyecto se abre completo en otro equipo.
+
+---
+
+## 13. Diseñar con Claude Desktop
+
+Con el servidor MCP de AeroForja, Claude Desktop dibuja, pesa y ensaya el dron en esta misma app: le describes lo que quieres o le mandas una foto o un boceto, y lo ves aparecer en vivo. La barra superior muestra **Claude conectado**.
+
+```bash
+pnpm install
+pnpm mcp:install     # registra el servidor en Claude Desktop; luego reinícialo del todo
+```
+
+Guía completa, herramientas, privacidad y límites: [`docs/claude-desktop.md`](docs/claude-desktop.md).
+
+---
+
+## Calidad: validación y pruebas
+
+Cada push pasa por GitHub Actions: TypeScript estricto en todos los paquetes, más de 300 tests y la build de producción.
+
+- **Validación física** (`packages/validation`): atmósfera ISA frente a la tabla de ICAO Doc 7488, aire húmedo frente a ASHRAE, modelo de masas frente a sólidos homogéneos, mallas STL frente a fórmulas cerradas (error < 10⁻¹²), y el túnel frente al ejemplo 7.2 de Bertin y Cummings, Helmbold, la línea sustentadora y DATCOM. Cada caso con su fuente y su tolerancia explicada.
+- **Tests de la app y del servidor MCP**: geometría de las tres vistas, booleanas, archivos v1–v3, STL, entrada del túnel (un ala entera y media ala simétrica dan la misma sustentación a 10⁻⁹) y el protocolo MCP por stdio de punta a punta.
+
+Lo que no está validado lo dice la app en ámbar o rojo, no en una nota al pie.
+
+---
+
 ## Atajos de teclado y ratón
 
 | Atajo | Acción |
@@ -557,6 +654,8 @@ pnpm mass            # masa, CG e inercia del cuerpo sintético de ejemplo
 pnpm mass mi-quad.json  # ...o de tu propio modelo (mismo formato que examples/mass-model.example.json)
 pnpm docker:local    # la app en Docker en http://localhost:8080 (igual que en el VPS)
 pnpm docs:capture    # rehace las capturas de este README (ver abajo)
+pnpm mcp             # el servidor MCP a mano (Claude Desktop lo arranca solo)
+pnpm mcp:install     # lo registra en Claude Desktop
 ```
 
 ### Regenerar las capturas
@@ -578,11 +677,16 @@ El GIF necesita además ffmpeg. Con `SCENES=drawing,editing pnpm docs:capture` s
 packages/
   physics/      núcleo puro: unidades SI, vectores FRD/NED, cuaterniones, Result<T>,
                 atmósfera (ISA, humedad, condiciones medidas) y modelo de masas
+                y túnel (VLM, Trefftz, fricción, resistencia por componentes, masa de mallas)
                 (sin UI, sin APIs de navegador ni de Node)
   validation/   casos de referencia publicados, con fuente, cadena de transcripción y tolerancia
   app/          interfaz web (Vite + React + three.js); la física corre en un Web Worker
-    src/planform/   geometría de la planta: modelo, booleanas, plantillas, malla, STL/SVG
-    src/ui/         paneles, editor de planta, visor 3D y tour guiado
+    src/planform/   dibujo en tres vistas: modelo, booleanas, plantillas, malla, STL/SVG
+    src/parts/      piezas STL: lectura, colocación, proyecciones, masa
+    src/tunnel/     del dibujo a la entrada del túnel
+    src/bridge/     enlace en vivo con Claude Desktop
+    src/ui/         paneles, editores de vista, visor 3D, túnel y tour guiado
+  mcp/          servidor MCP para Claude Desktop (stdio) y puente local con la app
 examples/       scripts de consola y el modelo de ejemplo
 scripts/        capturas de la documentación
 docs/design/    mini-diseños aprobados, uno por módulo físico, y notas de diseño
@@ -610,10 +714,11 @@ Notas de diseño del editor de planta: [`docs/design/003-planta-2d-a-3d.md`](doc
 
 ## Lo que todavía no hace
 
-- **Masa de las piezas dibujadas**: la planta es solo geometría. Volumen × densidad medida llega con el banco de materiales (módulo de fabricación) y su mini-diseño.
-- **Aerodinámica**: no hay todavía VLM, perfiles ni BEMT. Las alas se dibujan y se miden, pero no se calculan fuerzas.
+- **Masa de las piezas dibujadas**: el dibujo es solo geometría (las piezas STL sí tienen masa). Volumen × densidad medida llega con el banco de materiales (módulo de fabricación) y su mini-diseño.
+- **Aerodinámica de perfiles y hélices**: el túnel es de placas planas (VLM). Perfiles con XFOIL, BEMT de hélices con datos UIUC, superficies de mando y derivadas laterales: hoja de ruta.
+- **Vuelo**: todavía no hay simulación 6DOF ni motor/batería; el túnel da fuerzas y estabilidad estática, no dinámica.
 - **Perfil real del ala**: el 3D es una placa plana del espesor indicado (la técnica «placa plana» del módulo de fabricación). Costillas y perfiles, en la v1.
-- **Vistas lateral y frontal**, cotas editables, restricciones y variantes: MVP.
+- **Cotas editables, restricciones y variantes**: MVP.
 - **Kerf, anidado por plancha y DXF**: módulo de fabricación.
 - **Hélices**: el disco no tiene espesor y no hay modelo de interferencia entre rotores.
 - **Datos**: se guardan en cada navegador y en los JSON que descargues; no se sincronizan entre equipos.

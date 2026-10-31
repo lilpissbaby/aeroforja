@@ -19,7 +19,7 @@ export interface TourStep {
 
 const store = () => useAppStore.getState();
 
-const showPlanform = (view: "plan" | "split" | "3d" = "split") => {
+const showPlanform = (view: "plan" | "split" | "3d" | "three" | "tunnel" = "split") => {
   const s = store();
   if (s.panel !== "planform") s.setPanel("planform");
   if (s.view !== view) s.setView(view);
@@ -48,8 +48,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: (
       <>
         <p>
-          En unos minutos verás todo lo que puedes hacer ahora mismo: dibujar la planta de tu dron en un plano cartesiano,
-          ver su modelo 3D al momento, revisar los resultados con su método y su procedencia, y sacar archivos para el taller.
+          En unos minutos verás todo lo que puedes hacer ahora mismo: dibujar tu dron en planta, alzado y perfil, ver su
+          modelo 3D al momento, montarle piezas STL, ensayarlo en el túnel de viento virtual, revisar cada resultado con su
+          método y su procedencia, y sacar archivos para el taller. También puedes diseñarlo hablando con Claude.
         </p>
         <p>
           Avanza con <Keys>→</Keys> o «Siguiente», vuelve con <Keys>←</Keys> y sal con <Keys>Esc</Keys>. El tour no cambia
@@ -105,12 +106,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "left-tabs",
     target: "left-tabs",
     sides: ["right"],
-    title: "Planta o masas",
+    title: "Dibujo, piezas o masas",
     body: (
       <>
         <p>
-          <b>Planta</b>: la geometría del aparato vista desde arriba. <b>Masas</b>: las piezas con su peso, que dan la masa
-          total, el centro de gravedad y la inercia.
+          <b>Dibujo</b>: la geometría del aparato en sus tres vistas. <b>Piezas</b>: archivos STL que montas en el dron (una
+          montura de cámara, una cúpula). <b>Masas</b>: los componentes con su peso, que dan la masa total, el centro de
+          gravedad y la inercia.
         </p>
         <p>El panel de la derecha muestra las propiedades de lo que tengas seleccionado en cada pestaña.</p>
       </>
@@ -121,12 +123,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "plan-list",
     target: "plan-list",
     sides: ["right"],
-    title: "Elementos de la planta",
+    title: "Elementos del dibujo",
     body: (
       <>
         <p>
-          Cada línea es un elemento: nombre, tipo (placa, ala, vaciado o hélice), «×2» si es simétrico y sus medidas
-          principales. Haz clic para seleccionarlo.
+          Cada línea es un elemento: nombre, tipo (placa, ala, vaciado o hélice), «×2» si es simétrico, la vista en la que está
+          dibujado y sus medidas principales. Haz clic para seleccionarlo.
         </p>
         <p>Un punto rojo delante del nombre indica que ese elemento tiene un error y no se construye.</p>
       </>
@@ -144,8 +146,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
           central, bancadas, hélice en pulgadas, altura de la hélice y espesor.
         </p>
         <p>
-          <b>Ala por parámetros</b>: envergadura, cuerdas, flecha, posición y espesor, con puntos de partida de ala volante,
-          delta y ala recta.
+          <b>Ala por parámetros</b>: envergadura, cuerdas, flecha, posición, espesor y derivas de punta (en el perfil), con
+          puntos de partida de ala volante, delta y ala recta.
         </p>
         <p>«Sustituir planta» empieza de cero; «Añadir» lo suma a lo que tengas. Las dos cosas se deshacen con Ctrl+Z.</p>
       </>
@@ -155,14 +157,18 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "view-switch",
     target: "view-switch",
     sides: ["bottom"],
-    title: "Tres vistas sincronizadas",
+    title: "Planta, perfil, alzado y 3D",
     body: (
-      <p>
-        «Planta» deja todo el centro para dibujar, «3D» para el modelo y «Planta + 3D» las pone lado a lado. Lo que dibujas o
-        seleccionas en una aparece al instante en la otra.
-      </p>
+      <>
+        <p>
+          <b>Planta</b> (desde arriba, x e y), <b>Perfil</b> (desde la derecha, x y z) y <b>Alzado</b> (desde delante, y y z)
+          son tres planos cartesianos para dibujar. «Tres vistas + 3D» las pone juntas con el modelo; cada vista muestra en
+          discontinuo lo dibujado en las otras dos, y puedes engancharte a sus esquinas para alinearlas.
+        </p>
+        <p>«Túnel de viento» ensaya el diseño. Lo que dibujas o seleccionas en una vista aparece al instante en las demás.</p>
+      </>
     ),
-    prepare: () => showPlanform("split"),
+    prepare: () => showPlanform("three"),
   },
   {
     id: "plan-toolbar",
@@ -179,7 +185,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
           <b>Tipo</b>: qué será lo próximo que dibujes. Una hélice siempre es un círculo.
         </li>
         <li>
-          <b>Simetría</b>: crea también su reflejo al otro lado del eje x; al editar uno se edita el otro.
+          <b>Simetría</b>: crea también su reflejo respecto al plano y = 0; al editar uno se edita el otro. En el perfil el
+          reflejo es la pareja al otro lado (dos derivas).
         </li>
         <li>
           <b>Rejilla</b>: paso de ajuste. «auto» lo adapta al zoom; también 0,5 a 10 mm o sin ajuste.
@@ -198,8 +205,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: (
       <>
         <p>
-          Ves el dron desde arriba con el morro hacia arriba: <b>x adelante</b> en vertical, <b>y a la derecha</b> en
-          horizontal, en milímetros. El origen es el punto de referencia del aparato, el mismo que usa el modelo de masas.
+          En la planta ves el dron desde arriba con el morro hacia arriba: <b>x adelante</b> en vertical, <b>y a la
+          derecha</b> en horizontal, en milímetros. El perfil y el alzado funcionan igual con sus ejes, rotulados en cada
+          vista. El origen es el punto de referencia del aparato, el mismo que usa el modelo de masas.
         </p>
         <p>
           Rueda para el zoom hacia el cursor; arrastra el fondo (o usa el botón central o derecho) para desplazarte. Las cotas
@@ -241,7 +249,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         <li>Arrastra los cuadrados para mover vértices; los puntos «+» de cada lado añaden uno nuevo.</li>
         <li>Doble clic en un vértice lo quita. En cada lado ves su longitud en mm.</li>
         <li>
-          Flechas: mover la pieza (<Keys>Mayús</Keys> ×10). <Keys>Supr</Keys>: borrar. <Keys>Ctrl+D</Keys>: duplicar.
+          Flechas: mover la pieza (<Keys>Mayús</Keys> ×10); <Keys>Av Pág</Keys> <Keys>Re Pág</Keys>: mover su plano medio.{" "}
+          <Keys>Supr</Keys>: borrar. <Keys>Ctrl+D</Keys>: duplicar.
         </li>
       </ul>
     ),
@@ -267,8 +276,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: (
       <>
         <p>
-          Nombre, tipo y simetría. <b>z</b> es la altura del plano medio, positiva hacia abajo (ejes cuerpo FRD); el espesor se
-          reparte por igual arriba y abajo. Las placas con la misma z y el mismo espesor se funden en una sola plancha.
+          Nombre, tipo, simetría y la vista donde está dibujado. La <b>posición del plano medio</b> es z en la planta
+          (positiva hacia abajo, ejes FRD), y en el perfil y x en el alzado; el espesor se reparte por igual a cada lado. Las
+          piezas de la misma vista, plano y espesor se funden en una sola plancha.
         </p>
         <p>
           Los vértices se pueden escribir a mano en mm; en un círculo, centro y diámetro (las hélices también en pulgadas).
@@ -304,7 +314,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     title: "Qué se ve en 3D",
     body: (
       <p>
-        «Planta en 3D» muestra el modelo del dibujo. «Piezas de masa y CG» añade los bloques del modelo de masas, el símbolo
+        «Dibujo y piezas STL» muestra el modelo del dibujo y las piezas importadas. «Piezas de masa y CG» añade los bloques del modelo de masas, el símbolo
         del centro de gravedad y los ejes principales de inercia. «Encuadrar» centra la cámara en todo.
       </p>
     ),
@@ -317,8 +327,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: (
       <>
         <p>
-          <b>Planta</b>: envergadura, longitud, área en planta, volumen de piezas, superficie alar, alargamiento, cuerda media,
-          hélices y capas, con los errores enlazados a su elemento. Además: <b>Masa y CG</b>, <b>Inercia</b>, <b>Aire</b> y{" "}
+          <b>Dibujo</b>: envergadura, longitud, altura, áreas en planta y frontal, volumen de piezas, superficie alar,
+          alargamiento, derivas, hélices y capas, con los errores enlazados a su elemento. Además: <b>Masa y CG</b>, <b>Inercia</b>, <b>Aire</b> y{" "}
           <b>Avisos</b>.
         </p>
         <p>
@@ -342,6 +352,67 @@ export const TOUR_STEPS: readonly TourStep[] = [
         <p>El SVG aún no compensa el ancho de corte del láser (kerf); eso llega con el módulo de fabricación.</p>
       </>
     ),
+  },
+  {
+    id: "parts",
+    target: "parts-import",
+    sides: ["right"],
+    title: "Piezas STL",
+    body: (
+      <>
+        <p>
+          Importa un STL (binario o de texto, en mm, cm, pulgadas o m) y colócalo con posición, giro y escala. La app comprueba
+          que la malla está cerrada y calcula su volumen, centroide e inercia exactos (tetraedros con signo, Mirtich).
+        </p>
+        <p>
+          Cuenta en el modelo de masas cuando la pesas o indicas su densidad (nunca se supone una), y en el túnel con el Cd de
+          su forma sobre su área frontal real, siempre como ESTIMADO ±40 %.
+        </p>
+      </>
+    ),
+    prepare: () => {
+      const s = store();
+      if (s.panel !== "parts") s.setPanel("parts");
+    },
+  },
+  {
+    id: "tunnel",
+    target: "tunnel-settings",
+    sides: ["right"],
+    title: "Túnel de viento virtual",
+    body: (
+      <>
+        <p>
+          Barrido de ángulo de ataque del diseño tal como está dibujado y pesado. Sustentación y momentos por red de vórtices
+          (VLM, Katz y Plotkin), resistencia inducida en el plano de Trefftz y parásita por componentes (Raymer), con fricción
+          de placa plana y Cd de cuerpos romos.
+        </p>
+        <p>
+          Te da CLα, CD₀, e de Oswald, L/D, el <b>punto neutro y el margen estático</b> con el CG real, la balanza de seis
+          componentes, la carga en envergadura frente a la elíptica y el mapa de ΔCp. Hasta 5° verde, hasta 10° ámbar, más
+          allá rojo: la pérdida no se modela.
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("tunnel"),
+  },
+  {
+    id: "claude",
+    target: null,
+    title: "Diseñar hablando con Claude",
+    body: (
+      <>
+        <p>
+          Con el servidor MCP de AeroForja conectado a Claude Desktop puedes describir el dron o mandarle una foto o un boceto:
+          Claude lo dibuja aquí en las tres vistas, lo ve renderizado, lo ensaya en el túnel y te propone cambios.
+        </p>
+        <p>
+          Se instala con <code>pnpm mcp:install</code> y la app se conecta sola cuando está abierta en este equipo. Los pasos
+          están en el README, sección «Diseñar con Claude».
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("three"),
   },
   {
     id: "mass-list",

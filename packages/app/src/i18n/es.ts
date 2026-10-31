@@ -28,6 +28,14 @@ const METHODS: Readonly<Record<string, string>> = {
   "homogeneous-solid-inertia": "Inercia de sólidos homogéneos (caja, cilindro, tubo, esfera)",
   "principal-axes-jacobi": "Ejes principales por rotaciones de Jacobi",
   "gum-first-order": "Propagación de incertidumbre de primer orden (GUM)",
+  "vortex-lattice-horseshoe": "Red de vórtices en herradura (VLM): segmento ligado al 1/4 del panel, punto de control al 3/4, estela por −x cuerpo",
+  "kutta-joukowski-panel-forces": "Fuerzas de panel por Kutta–Joukowski, F = ρ Γ (V × l), momentos respecto al CG",
+  "trefftz-plane-induced-drag": "Resistencia inducida en el plano de Trefftz",
+  "flat-plate-skin-friction": "Fricción de placa plana lisa: Blasius (laminar) y Prandtl–Schlichting (turbulenta)",
+  "component-drag-buildup": "Resistencia parásita por componentes (Raymer, 12.5)",
+  "bluff-body-drag-coefficients": "Resistencia de cuerpos romos, (D/q) = Cd · A frontal (NASA Glenn)",
+  "neutral-point-static-margin": "Punto neutro por dCm/dCL en la zona lineal y margen estático",
+  "polyhedral-mass-properties": "Propiedades de masa de una malla cerrada por tetraedros con signo (Mirtich, Tonon)",
 };
 
 const ASSUMPTIONS: Readonly<Record<string, string>> = {
@@ -49,11 +57,29 @@ const ASSUMPTIONS: Readonly<Record<string, string>> = {
     "Incertidumbre de masa y CG por propagación de primer orden; un dato sin incertidumbre cuenta como exacto.",
   "no-input-uncertainty": "Ningún dato tiene incertidumbre, así que masa y CG se dan sin banda.",
   "inertia-uncertainty-not-propagated": "La incertidumbre de la inercia todavía no se propaga.",
+  "potential-flow": "Flujo potencial, incompresible y estacionario: sin separación ni pérdida. Fuera de la zona lineal los resultados no son físicos.",
+  "flat-wake": "Estela plana a lo largo del eje x cuerpo (ángulos pequeños).",
+  "flat-plates": "Las superficies sustentadoras son placas planas sin espesor, curvatura, torsión ni diedro en el VLM; el espesor solo entra en la resistencia.",
+  "no-propellers": "Las hélices no se modelan: ni tracción ni estela; sus discos se ignoran.",
+  "smooth-plate-friction": "Fricción de placa lisa con transición en Re = 5·10⁵; las placas de cantos vivos tienen burbujas de separación a bajo Reynolds, así que la resistencia real será mayor.",
+  "bluff-drag-estimated": "Resistencia de cuerpos y cantos romos con Cd tabulados de formas genéricas, ±40 %; la interferencia solo entra con el factor Q.",
+  "beta-zero": "Derrape β = 0.",
+  "uniform-density": "Densidad uniforme: vale para resina y piezas macizas; una pieza FDM con relleno hay que pesarla y su inercia es aproximada.",
+  "mesh-is-the-part": "La malla es la pieza: su exactitud es la del archivo exportado.",
   "inertia-about-calculated-cg":
     "El CG es medido pero la inercia es calculada: la inercia sigue referida al CG calculado.",
 };
 
 const CHECKS: Readonly<Record<string, { label: string; note: string }>> = {
+  mach: { label: "Mach", note: "Flujo incompresible: solo por debajo de Mach 0,3." },
+  alphaRangeOfSummary: {
+    label: "α del resumen",
+    note: "La pendiente, el punto neutro y el factor de Oswald se ajustan solo con |α| ≤ 5° (placa plana a bajo Reynolds).",
+  },
+  parasiteDragCalibration: {
+    label: "Resistencia parásita",
+    note: "La suma por componentes no está calibrada con un ensayo de este aparato: ámbar hasta que haya una resistencia medida.",
+  },
   geopotentialAltitude: {
     label: "Altitud",
     note: "La ley de la troposfera vale de −5 000 a 11 000 m de altitud geopotencial.",
@@ -88,6 +114,13 @@ export const methodName = (m: Method): string => METHODS[m.id] ?? m.name;
 export const assumptionText = (a: Assumption): string => ASSUMPTIONS[a.id] ?? a.description;
 
 export function checkText(check: ValidityCheck): { label: string; note: string } {
+  const re = /^reynolds\[(.+)\]$/.exec(check.quantity);
+  if (re !== null) {
+    return {
+      label: `Reynolds de ${re[1]}`,
+      note: "Fricción de placa plana: validada de 5·10⁴ a 5·10⁵ (laminar); por debajo de 2·10⁴ la capa límite no es la de una placa plana.",
+    };
+  }
   const component = /^component\[(.+)\]\.(.+)$/.exec(check.quantity);
   if (component !== null) {
     const inner = CHECKS[component[2] ?? ""];

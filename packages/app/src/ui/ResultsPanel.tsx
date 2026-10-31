@@ -12,6 +12,7 @@ import {
 } from "../units/display.ts";
 import type { Outcome } from "../worker/protocol.ts";
 import type { PlanformIssue } from "../planform/geometry.ts";
+import { AXIS_NAMES, PLANE_SPECS } from "../planform/planes.ts";
 import { mm1 } from "../planform/view.ts";
 import { ExportButtons } from "./planform/ExportButtons.tsx";
 import { usePlanformAnalysis } from "./planform/usePlanformAnalysis.ts";
@@ -158,10 +159,10 @@ function AirTab() {
 function PlanTab() {
   const a = usePlanformAnalysis();
   const select = useAppStore((s) => s.selectPlanElement);
-  if (a.bounds === null) {
-    return <p className="hint">La planta está vacía: dibuja en el plano o usa una plantilla del panel izquierdo.</p>;
+  if (a.box === null) {
+    return <p className="hint">El dibujo está vacío: dibuja en la planta, el alzado o el perfil, o usa una plantilla del panel izquierdo.</p>;
   }
-  const b = a.bounds;
+  const b = a.box;
   const cm2 = (m2: number) => formatFixed(m2 * 1e4, 1);
   return (
     <>
@@ -171,9 +172,11 @@ function PlanTab() {
       </div>
       <div className="columns">
         <dl className="values">
-          <Value label="Envergadura (y)" value={mm1(b.maxY - b.minY)} unit="mm" />
-          <Value label="Longitud (x)" value={mm1(b.maxX - b.minX)} unit="mm" />
+          <Value label="Envergadura (y)" value={mm1(b.max[1] - b.min[1])} unit="mm" />
+          <Value label="Longitud (x)" value={mm1(b.max[0] - b.min[0])} unit="mm" />
+          <Value label="Altura (z)" value={mm1(b.max[2] - b.min[2])} unit="mm" />
           <Value label="Área en planta" value={cm2(a.projectedArea)} unit="cm²" />
+          <Value label="Área frontal" value={cm2(a.frontalArea)} unit="cm²" />
           <Value label="Volumen de piezas" value={formatFixed(a.volume * 1e6, 2)} unit="cm³" />
         </dl>
         {a.wing !== null && (
@@ -182,6 +185,13 @@ function PlanTab() {
             <Value label="Envergadura alar b" value={mm1(a.wing.span)} unit="mm" />
             <Value label="Alargamiento b²/S" value={formatFixed(a.wing.aspectRatio, 2)} unit="" />
             <Value label="Cuerda media S/b" value={mm1(a.wing.meanChord)} unit="mm" />
+          </dl>
+        )}
+        {a.vertical !== null && (
+          <dl className="values">
+            <Value label="Derivas (perfil)" value={String(a.vertical.count)} unit="" />
+            <Value label="Área vertical" value={formatFixed(a.vertical.area * 100, 2)} unit="dm²" />
+            <Value label="Altura de deriva" value={mm1(a.vertical.height)} unit="mm" />
           </dl>
         )}
         {a.rotorSummary !== null && (
@@ -195,7 +205,7 @@ function PlanTab() {
           {a.layers.map((l, i) => (
             <Value
               key={l.key}
-              label={`Capa ${i + 1}: z ${mm1(l.z)}, ${mm1(l.thickness)} mm`}
+              label={`Capa ${i + 1}: ${PLANE_SPECS[l.plane].label.toLowerCase()}, ${AXIS_NAMES[PLANE_SPECS[l.plane].n]} ${mm1(l.offset)}, ${mm1(l.thickness)} mm`}
               value={`${cm2(l.area)} cm² · ${l.bodies.length} ${l.bodies.length === 1 ? "pieza" : "piezas"}`}
               unit=""
             />
@@ -314,7 +324,7 @@ export function ResultsPanel() {
   const warnings = collectWarnings(results);
   const count = warnings.length + planIssues.length;
   const tabs: readonly [Tab, string][] = [
-    ["plan", "Planta"],
+    ["plan", "Dibujo"],
     ["mass", "Masa y CG"],
     ["inertia", "Inercia"],
     ["air", "Aire"],

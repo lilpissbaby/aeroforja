@@ -22,7 +22,9 @@
     "docker:local:down": "docker compose -f docker/docker-compose.local.yml down",
     "isa": "node --disable-warning=ExperimentalWarning examples/isa.ts",
     "air": "node --disable-warning=ExperimentalWarning examples/air.ts",
-    "mass": "node --disable-warning=ExperimentalWarning examples/mass.ts"
+    "mass": "node --disable-warning=ExperimentalWarning examples/mass.ts",
+    "mcp": "node --disable-warning=ExperimentalWarning packages/mcp/src/server.ts",
+    "mcp:install": "node --disable-warning=ExperimentalWarning packages/mcp/src/install.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

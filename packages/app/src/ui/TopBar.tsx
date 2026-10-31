@@ -1,5 +1,34 @@
 import { useAppStore, type ThemeChoice } from "../state/store.ts";
 import { NumberField } from "./NumberField.tsx";
+import { resolveConflict, useClaudeLink } from "../bridge/claude.ts";
+
+/** Shown only when Claude Desktop's AeroForja server is running on this computer. */
+function ClaudeChip() {
+  const link = useClaudeLink();
+  if (link.status !== "connected") return null;
+  return (
+    <>
+      <span className="claude-chip" title="El servidor MCP de AeroForja está activo: lo que Claude cambia aparece aquí al momento.">
+        <span className="dot" aria-hidden="true" /> Claude conectado
+      </span>
+      {link.conflict !== null && (
+        <div className="claude-conflict" role="alertdialog" aria-label="Diseño distinto en Claude">
+          <p>
+            Claude Desktop tiene otro diseño («{link.conflict.name}», {link.conflict.elements} elementos). ¿Con cuál seguís?
+          </p>
+          <div className="row">
+            <button type="button" className="button" onClick={() => resolveConflict("claude")}>
+              Abrir el de Claude
+            </button>
+            <button type="button" className="button primary" onClick={() => resolveConflict("browser")}>
+              Enviar el mío a Claude
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 export function TopBar() {
   const projectName = useAppStore((s) => s.projectName);
@@ -56,6 +85,7 @@ export function TopBar() {
       </fieldset>
 
       <div className="topbar-end" data-tour="topbar-end">
+        <ClaudeChip />
         <button type="button" className="button tour-button" onClick={startTour}>
           <span className="tour-glyph" aria-hidden="true">
             ?

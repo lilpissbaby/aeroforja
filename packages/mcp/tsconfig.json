@@ -1,0 +1,13 @@
+{
+  // Node only: no DOM. Imports shared modules from the app's sources
+  // (drawing, tunnel geometry, project file), which use no browser API.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "resolveJsonModule": true,
+    // Node runs these sources by stripping types: no enums, namespaces or parameter properties.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

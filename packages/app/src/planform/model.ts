@@ -1,24 +1,24 @@
 /**
- * Planform (top view) of the aircraft as the 2D editor draws it.
+ * The drawing of the aircraft as the editor makes it: flat elements drawn in
+ * one of three planes (planta, alzado, perfil; see planes.ts) and extruded
+ * along that plane's normal by their thickness.
  *
- * Every coordinate is in SI and in body axes FRD seen from above: x forward,
- * y right, and z (positive down) for the height of each element. The origin
- * is the same reference point as the mass model, so both share one body
- * frame.
+ * Everything is SI and body axes FRD (x forward, y right, z down), with the
+ * same origin as the mass model, so both share one body frame.
  *
- * This is geometry only. It does not carry masses or aerodynamic data: the
- * link to the mass model (volume × measured density of each material) needs
- * the material bank of the fabrication module and its own mini-design.
+ * Geometry only: no masses or aerodynamic data. Lifting surfaces are the
+ * elements of role "wing", which the VLM of the wind tunnel reads.
  */
 import { meters, type Meters } from "@aeroforja/physics";
+import type { PlaneId } from "./planes.ts";
 
 /**
  * What an element is:
  * - plate: structure cut or printed from a sheet, extruded to its thickness.
- * - wing: a lifting surface, also extruded as a flat plate for now; the VLM
- *   will read these elements as its planform.
- * - hole: a cut-out through the plates and wings it crosses at its height.
- * - rotor: a propeller disc, drawn as a plane with no thickness.
+ * - wing: a lifting surface (wing, tail, fin), also extruded as a flat plate.
+ * - hole: a cut-out through the plates and wings of its plane that it crosses.
+ * - rotor: a propeller disc, a plane with no thickness. Horizontal rotors are
+ *   drawn in the planta, tractor and pusher propellers in the alzado.
  */
 export type PlanformRole = "plate" | "wing" | "hole" | "rotor";
 
@@ -31,32 +31,37 @@ export const ROLE_LABELS: Readonly<Record<PlanformRole, string>> = {
   rotor: "Hélice (disco)",
 };
 
-/** A point of the top view, body axes FRD: x forward, y right. */
-export interface PlanPoint {
-  readonly x: Meters;
-  readonly y: Meters;
+/** A point in the element's drawing plane, metres (see planes.ts for the axes). */
+export interface PlanePoint {
+  readonly u: Meters;
+  readonly v: Meters;
 }
 
 interface ElementCommon {
   readonly id: string;
   readonly name: string;
   readonly role: PlanformRole;
-  /** Also build the mirror image about the plane of symmetry (y → −y). */
+  readonly plane: PlaneId;
+  /**
+   * Also build the mirror image about the plane of symmetry (y → −y). In the
+   * planta and the alzado it is drawn in the same plane; in the perfil it is
+   * a copy at the opposite offset (y → −y).
+   */
   readonly mirror: boolean;
-  /** Thickness along body z. Not used by holes and rotor discs. */
+  /** Thickness along the plane's normal. Not used by holes and rotor discs. */
   readonly thickness: Meters;
-  /** Body z (positive down) of the element's mid-plane; for a rotor, the disc plane. */
-  readonly z: Meters;
+  /** Position of the mid-plane along the plane's normal: z (planta), y (perfil) or x (alzado). */
+  readonly offset: Meters;
 }
 
 export interface PolygonElement extends ElementCommon {
   readonly shape: "polygon";
-  readonly points: readonly PlanPoint[];
+  readonly points: readonly PlanePoint[];
 }
 
 export interface CircleElement extends ElementCommon {
   readonly shape: "circle";
-  readonly center: PlanPoint;
+  readonly center: PlanePoint;
   readonly radius: Meters;
 }
 
@@ -70,10 +75,10 @@ export const EMPTY_PLANFORM: Planform = { elements: [] };
 
 /** Starting values for a new element; the builder edits them afterwards. */
 export const DEFAULT_THICKNESS = meters(0.003);
-/** A drawn propeller disc starts 20 mm above the mid-plane of the plates. */
+/** A drawn propeller disc in the planta starts 20 mm above the mid-plane of the plates. */
 export const DEFAULT_ROTOR_Z = meters(-0.02);
 
-export const planPoint = (x: number, y: number): PlanPoint => ({ x: meters(x), y: meters(y) });
+export const planePoint = (u: number, v: number): PlanePoint => ({ u: meters(u), v: meters(v) });
 
 /** Rounds to the micrometre so generated shapes have no 1e-17 noise. */
 export const roundMicro = (v: number): number => {
@@ -89,14 +94,15 @@ export function uniqueElementId(planform: Planform, base: string): string {
   }
 }
 
-export function defaultZ(role: PlanformRole): Meters {
-  return role === "rotor" ? DEFAULT_ROTOR_Z : meters(0);
+export function defaultOffset(role: PlanformRole, plane: PlaneId): Meters {
+  return role === "rotor" && plane === "top" ? DEFAULT_ROTOR_Z : meters(0);
 }
 
-/** Translates an element in the plan by (dx, dy) metres. */
-export function translateElement(element: PlanformElement, dx: number, dy: number): PlanformElement {
-  const move = (p: PlanPoint): PlanPoint => planPoint(roundMicro(p.x + dx), roundMicro(p.y + dy));
+/** Translates an element within its plane by (du, dv) and along its normal by dOffset, metres. */
+export function translateElement(element: PlanformElement, du: number, dv: number, dOffset = 0): PlanformElement {
+  const move = (p: PlanePoint): PlanePoint => planePoint(roundMicro(p.u + du), roundMicro(p.v + dv));
+  const offset = meters(roundMicro(element.offset + dOffset));
   return element.shape === "polygon"
-    ? { ...element, points: element.points.map(move) }
-    : { ...element, center: move(element.center) };
+    ? { ...element, offset, points: element.points.map(move) }
+    : { ...element, offset, center: move(element.center) };
 }

@@ -22,3 +22,12 @@ export {
   PRINCIPAL_AXES_JACOBI,
   RIGID_BODY_MASS_PROPERTIES,
 } from "./methods.ts";
+export {
+  POLYHEDRAL_MASS_PROPERTIES,
+  meshGeometry,
+  meshMassProperties,
+  meshTopology,
+  type MeshGeometry,
+  type MeshMassProperties,
+  type MeshTopology,
+} from "./polyhedron.ts";

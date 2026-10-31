@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "./state/store.ts";
 import { startPhysicsWorker } from "./worker/client.ts";
+import { startClaudeBridge } from "./bridge/claude.ts";
 import { LeftPanel } from "./ui/LeftPanel.tsx";
 import { PlanformProperties } from "./ui/planform/PlanformProperties.tsx";
 import { PropertiesPanel } from "./ui/PropertiesPanel.tsx";
+import { PartProperties } from "./ui/parts/PartProperties.tsx";
 import { ResultsPanel } from "./ui/ResultsPanel.tsx";
 import { TopBar } from "./ui/TopBar.tsx";
 import { Workspace } from "./ui/Workspace.tsx";
@@ -32,6 +34,7 @@ export function App() {
   const theme = useEffectiveTheme();
   const panel = useAppStore((s) => s.panel);
   useEffect(() => startPhysicsWorker(), []);
+  useEffect(() => startClaudeBridge(), []);
   // First visit: the guided tour opens by itself once.
   useEffect(() => {
     if (!tourSeen()) useAppStore.getState().startTour();
@@ -41,7 +44,7 @@ export function App() {
       <TopBar />
       <LeftPanel />
       <Workspace theme={theme} />
-      {panel === "planform" ? <PlanformProperties /> : <PropertiesPanel />}
+      {panel === "planform" ? <PlanformProperties /> : panel === "parts" ? <PartProperties /> : <PropertiesPanel />}
       <ResultsPanel />
       <Tour />
     </div>

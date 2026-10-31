@@ -8,9 +8,11 @@ import { Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { FRD_TO_THREE } from "../../three/frames.ts";
-import { elementAtPoint, elementOutlines, type PlanformAnalysis, type SolidLayer, type Vec2 } from "../../planform/geometry.ts";
+import type { Triple } from "@aeroforja/physics";
+import { elementAtPoint, elementOutlines, type PlanformAnalysis, type SolidLayer } from "../../planform/geometry.ts";
 import { layerGeometries } from "../../planform/mesh.ts";
 import type { Planform } from "../../planform/model.ts";
+import { PLANE_SPECS, toBody, type PlaneId } from "../../planform/planes.ts";
 
 export interface PlanPalette {
   readonly plate: string;
@@ -19,7 +21,7 @@ export interface PlanPalette {
   readonly accent: string;
 }
 
-const FRD_QUATERNION = (() => {
+export const FRD_QUATERNION = (() => {
   const m = FRD_TO_THREE;
   const matrix = new THREE.Matrix4().set(m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, m[6], m[7], m[8], 0, 0, 0, 0, 1);
   return new THREE.Quaternion().setFromRotationMatrix(matrix);
@@ -28,7 +30,22 @@ const FRD_QUATERNION = (() => {
 /** three.js scene point → body FRD point (inverse of frdToThree). */
 const threeToFrd = (p: THREE.Vector3): [number, number, number] => [-p.z, p.x, -p.y];
 
-function Layer({ layer, color, onPick }: { layer: SolidLayer; color: string; onPick: (layer: SolidLayer, p: Vec2) => void }) {
+/** Rotation that takes a circle drawn in three.js's local x-y plane to a disc in a view's plane (body axes). */
+function discQuaternion(plane: PlaneId): THREE.Quaternion {
+  const s = PLANE_SPECS[plane];
+  const axis = (i: number) => new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0);
+  const n = axis(s.n).multiplyScalar(s.wSign);
+  const m = new THREE.Matrix4().makeBasis(axis(s.u), axis(s.v), n);
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+const DISC_QUATERNIONS: Readonly<Record<PlaneId, THREE.Quaternion>> = {
+  top: discQuaternion("top"),
+  side: discQuaternion("side"),
+  front: discQuaternion("front"),
+};
+
+function Layer({ layer, color, onPick }: { layer: SolidLayer; color: string; onPick: (layer: SolidLayer, p: Triple) => void }) {
   const geometries = useMemo(() => layerGeometries(layer), [layer]);
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
   return (
@@ -39,8 +56,7 @@ function Layer({ layer, color, onPick }: { layer: SolidLayer; color: string; onP
           geometry={g}
           onClick={(e: ThreeEvent<MouseEvent>) => {
             e.stopPropagation();
-            const [x, y] = threeToFrd(e.point);
-            onPick(layer, [x, y]);
+            onPick(layer, threeToFrd(e.point));
           }}
         >
           <meshStandardMaterial color={color} roughness={0.8} metalness={0.02} />
@@ -68,16 +84,18 @@ export function PlanformBodies({
 
   const outline = useMemo(() => {
     if (selected === null || selected.role === "rotor") return null;
-    // Drawn just above the top face so it is not hidden inside the solid.
-    const top = selected.role === "hole" ? selected.z : selected.z - selected.thickness / 2 - 0.0003;
+    // Drawn just off the face that looks at the viewer of its view (−w side), so it is not hidden inside the solid.
+    const s = PLANE_SPECS[selected.plane];
+    const lift = selected.role === "hole" ? 0 : selected.thickness / 2 + 0.0003;
     return elementOutlines(selected).map((o) => {
-      const ring = o.ring.map(([x, y]) => [x, y, top] as [number, number, number]);
+      const face = o.offset - s.wSign * lift;
+      const ring = o.ring.map(([u, v]) => toBody(selected.plane, u, v, face) as [number, number, number]);
       return ring.length > 0 ? [...ring, ring[0]!] : ring;
     });
   }, [selected]);
 
-  const pick = (layer: SolidLayer, p: Vec2) => {
-    const id = elementAtPoint(planform, layer.elementIds, p);
+  const pick = (layer: SolidLayer, p: Triple) => {
+    const id = elementAtPoint(planform, layer, p);
     if (id !== null) onSelect(id);
   };
 
@@ -90,7 +108,7 @@ export function PlanformBodies({
       {analysis.rotors.map((r) => {
         const isSelected = r.elementId === selectedId;
         return (
-          <group key={`${r.elementId}-${r.mirrored}`} position={[r.center[0], r.center[1], r.z]}>
+          <group key={`${r.elementId}-${r.mirrored}`} position={[r.center3[0], r.center3[1], r.center3[2]]} quaternion={DISC_QUATERNIONS[r.plane]}>
             <mesh
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();

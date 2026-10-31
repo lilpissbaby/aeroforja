@@ -383,7 +383,7 @@ async function layersAndHoles(page) {
   await page.locator(".left .component-list button", { hasText: "Placa superior" }).click();
   await pause(1200);
   await shot(page, "25-capas-y-vaciados", workspace);
-  await resultsTab(page, "Planta");
+  await resultsTab(page, "Dibujo");
   await page.locator(".bottom details.method summary").click();
   // A taller results panel for this one capture, so the method and its references fit.
   await page.addStyleTag({ content: ".app{grid-template-rows:auto minmax(0,1fr) 560px !important}" });
@@ -564,13 +564,142 @@ async function animation(browser) {
   }
 }
 
+// ---------- three views, tunnel, STL parts, Claude Desktop ----------
+
+const WING_TEMPLATE = async (page) => {
+  await page.locator(".left .tabs").getByRole("tab", { name: "Dibujo" }).click();
+  const wing = page.locator("details.template", { hasText: "Ala por parámetros" });
+  if (!(await wing.evaluate((d) => d.open))) await wing.locator("summary").click();
+  await wing.getByRole("button", { name: "Sustituir planta" }).click();
+  await pause(1200);
+};
+
+async function threeViews(page) {
+  console.log("Tres vistas");
+  await fresh(page);
+  await WING_TEMPLATE(page);
+  await view(page, "Tres vistas + 3D");
+  await pause(1500);
+  await shot(page, "50-tres-vistas");
+  await view(page, "Perfil");
+  await pause(900);
+  await page.locator(".left .component-list button", { hasText: "Deriva" }).click();
+  await pause(600);
+  await shot(page, "51-perfil-deriva");
+  await view(page, "Alzado");
+  await tool(page, "Círculo");
+  await elementType(page, "rotor");
+  const svg = page.locator("svg.plan-canvas");
+  const b = await svg.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2 - 10);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 + 34, b.y + b.height / 2 - 10, { steps: 8 });
+  await page.mouse.up();
+  await pause(600);
+  await tool(page, "Seleccionar");
+  // A pusher behind the trailing edge: its disc must not cross the wing.
+  await page.getByLabel("x del disco (+ adelante)").fill("-240");
+  await page.getByLabel("x del disco (+ adelante)").press("Enter");
+  await pause(800);
+  await shot(page, "52-alzado-helice");
+}
+
+async function tunnelScene(page) {
+  console.log("Túnel");
+  await fresh(page);
+  await WING_TEMPLATE(page);
+  await view(page, "Túnel de viento");
+  await page.waitForSelector(".chart-grid", { timeout: 30000 });
+  await pause(1200);
+  await shot(page, "53-tunel");
+  await page.locator(".tunnel-main").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await pause(500);
+  await shot(page, "54-tunel-balanza", ".tunnel-main");
+  await shot(page, "55-tunel-resultado", ".tunnel-side");
+}
+
+function boxStl(a, b, c) {
+  const v = [[0, 0, 0], [a, 0, 0], [a, b, 0], [0, b, 0], [0, 0, c], [a, 0, c], [a, b, c], [0, b, c]];
+  const faces = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [0, 4, 7, 3]];
+  const tris = faces.flatMap(([p, q, r, s]) => [[v[p], v[q], v[r]], [v[p], v[r], v[s]]]);
+  const buf = Buffer.alloc(84 + 50 * tris.length);
+  buf.write("AeroForja docs: camera mount block", 0, "ascii");
+  buf.writeUInt32LE(tris.length, 80);
+  tris.forEach((t, i) => t.forEach((p, k) => p.forEach((x, j) => buf.writeFloatLE(x, 84 + i * 50 + 12 + k * 12 + j * 4))));
+  return buf;
+}
+
+async function partsScene(page) {
+  console.log("Piezas STL");
+  await fresh(page);
+  const file = path.join(tmp, "montura-camara.stl");
+  fs.writeFileSync(file, boxStl(28, 32, 24));
+  await page.locator(".left .tabs").getByRole("tab", { name: "Piezas" }).click();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("button", { name: "Importar STL" }).click()]);
+  await chooser.setFiles(file);
+  await pause(800);
+  await page.getByLabel("x (adelante)").fill("70");
+  await page.getByLabel("x (adelante)").press("Enter");
+  await page.getByLabel("z (abajo)").fill("12");
+  await page.getByLabel("z (abajo)").press("Enter");
+  await page.locator("#part-mass-kind").selectOption("weighed");
+  await page.getByLabel("Masa", { exact: true }).fill("14.2");
+  await page.getByLabel("Masa", { exact: true }).press("Enter");
+  await page.getByLabel("Cuenta en el modelo de masas (masa, CG e inercia)").check();
+  await view(page, "Tres vistas + 3D");
+  await pause(1500);
+  await shot(page, "56-pieza-stl");
+  await shot(page, "57-pieza-propiedades", ".right");
+}
+
+async function claudeScene(page) {
+  console.log("Claude Desktop");
+  const server = require("node:child_process").spawn(process.execPath, ["--disable-warning=ExperimentalWarning", path.join(ROOT, "packages/mcp/src/server.ts")], {
+    env: { ...process.env, AEROFORJA_PROJECT: path.join(tmp, "claude.json") },
+    stdio: ["pipe", "pipe", "ignore"],
+  });
+  let id = 0;
+  const pending = new Map();
+  require("node:readline").createInterface({ input: server.stdout }).on("line", (l) => {
+    const m = JSON.parse(l);
+    pending.get(m.id)?.(m);
+  });
+  const rpc = (method, params) =>
+    new Promise((resolve) => {
+      pending.set(++id, resolve);
+      server.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+    });
+  const tool = (name, args) => rpc("tools/call", { name, arguments: args });
+  await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "docs", version: "1" } });
+  await fresh(page);
+  await page.waitForSelector(".claude-chip", { timeout: 15000 });
+  await page.getByRole("button", { name: "Abrir el de Claude" }).click();
+  await view(page, "Tres vistas + 3D");
+  await tool("set_design_name", { name: "Ala volante con propulsora (Claude)" });
+  await tool("apply_template", { template: "wing", replace: true, params: { span_mm: 1000, root_chord_mm: 280, tip_chord_mm: 130, sweep_deg: 30, fin_height_mm: 100 } });
+  await tool("add_elements", {
+    elements: [
+      { name: "Fuselaje", role: "plate", plane: "side", shape: "polygon", points_mm: [[190, 0], [140, -34], [-90, -34], [-150, 0]] },
+      { name: "Hélice propulsora", role: "rotor", plane: "front", shape: "circle", center_mm: [0, -17], diameter_in: 8, offset_mm: -240 },
+    ],
+  });
+  await pause(2500);
+  await shot(page, "58-claude-en-vivo");
+  const render = await tool("render_views", { width_px: 1280 });
+  fs.writeFileSync(path.join(OUT, "59-claude-render.png"), Buffer.from(render.result.content[0].data, "base64"));
+  done.push("59-claude-render");
+  console.log("  ✓ 59-claude-render");
+  server.stdin.end();
+  server.kill();
+}
+
 (async () => {
   const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist"] });
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: "light", acceptDownloads: true });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.error("pageerror:", e.message));
   const only = process.env.SCENES?.split(",");
-  const scenes = { overview, tour, templates, drawing, editing, layersAndHoles, problems, massAndResults, exports };
+  const scenes = { overview, tour, templates, drawing, editing, layersAndHoles, problems, massAndResults, exports, threeViews, tunnelScene, partsScene, claudeScene };
   for (const [name, scene] of Object.entries(scenes)) {
     if (only === undefined || only.includes(name)) await scene(page);
   }

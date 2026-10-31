@@ -4,12 +4,13 @@
  * - STL (binary) of every piece for printing. Slicers expect Z up, so body
  *   FRD (x forward, y right, z down) is rotated 180° about x into
  *   (x forward, y left, z up). Holes and rotor discs are not printed.
- * - SVG of every sheet seen from above for cutting or as a paper template,
- *   with a 50 mm control bar to check the print scale. No kerf compensation
+ * - SVG of every sheet, drawn as in its view, for cutting or as a paper
+ *   template, with a 50 mm control bar to check the print scale. No kerf compensation
  *   yet: that needs the kerf measured on your machine (fabrication module).
  */
-import type { PolygonWithHoles, Ring, SolidLayer } from "./geometry.ts";
+import type { PolygonWithHoles, Ring, SolidLayer, Vec2 } from "./geometry.ts";
 import { ringsBounds } from "./geometry.ts";
+import { PLANE_SPECS, planeToScreen } from "./planes.ts";
 import { layerGeometries, triangles } from "./mesh.ts";
 
 const MM = 1000;
@@ -86,26 +87,16 @@ export function binaryStl(tris: Float32Array, header: string): ArrayBuffer {
 
 const fmt = (v: number): string => (Math.round(v * 1000) / 1000).toString();
 
-/** Plan point (FRD m) → SVG mm: nose up, right wing to the right. */
-const svgPoint = (x: number, y: number): [number, number] => [y * MM, -x * MM];
-
-function ringPath(ring: Ring, dx: number, dy: number): string {
-  return (
-    ring
-      .map(([x, y], i) => {
-        const [sx, sy] = svgPoint(x, y);
-        return `${i === 0 ? "M" : "L"}${fmt(sx + dx)} ${fmt(sy + dy)}`;
-      })
-      .join(" ") + " Z"
-  );
-}
-
 const escapeXml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const mmText = (m: number): string => (m * MM).toFixed(1).replace(".", ",");
 
-/** All sheets side by side, each with its label, at 1:1 in millimetres. */
+/**
+ * All sheets side by side, each with its label, at 1:1 in millimetres. Each
+ * sheet is drawn as seen in its own view (planta nose up, perfil nose to
+ * the right, alzado from the front), so it matches the editor.
+ */
 export function planformSvg(layers: readonly SolidLayer[], title: string): string {
   const margin = 10;
   const gap = 15;
@@ -115,18 +106,27 @@ export function planformSvg(layers: readonly SolidLayer[], title: string): strin
   let height = 0;
 
   layers.forEach((layer, index) => {
-    const outers = layer.bodies.map((p: PolygonWithHoles) => p[0]!);
+    const screen = (p: Vec2): Vec2 => {
+      const [h, v] = planeToScreen(layer.plane, p[0], p[1]);
+      return [h * MM, v * MM];
+    };
+    const outers = layer.bodies.map((p: PolygonWithHoles) => p[0]!.map(screen));
     const b = ringsBounds(outers);
     if (b === null) return;
-    // In SVG mm the sheet spans y·1000 horizontally and −x·1000 vertically.
-    const left = b.minY * MM;
-    const top = -b.maxX * MM;
-    const width = (b.maxY - b.minY) * MM;
-    const h = (b.maxX - b.minX) * MM;
-    const dx = cursorX - left;
-    const dy = margin - top;
-    const d = layer.bodies.map((p) => p.map((ring) => ringPath(ring, dx, dy)).join(" ")).join(" ");
-    const label = `Capa ${index + 1} · espesor ${mmText(layer.thickness)} mm · z ${mmText(layer.z)} mm`;
+    const width = b.maxX - b.minX;
+    const h = b.maxY - b.minY;
+    const dx = cursorX - b.minX;
+    const dy = margin - b.minY;
+    const path = (ring: Ring): string =>
+      ring
+        .map((p, i) => {
+          const [sx, sy] = screen(p);
+          return `${i === 0 ? "M" : "L"}${fmt(sx + dx)} ${fmt(sy + dy)}`;
+        })
+        .join(" ") + " Z";
+    const d = layer.bodies.map((p) => p.map(path).join(" ")).join(" ");
+    const axis = ["x", "y", "z"][PLANE_SPECS[layer.plane].n];
+    const label = `Capa ${index + 1} · ${PLANE_SPECS[layer.plane].label.toLowerCase()} · espesor ${mmText(layer.thickness)} mm · ${axis} ${mmText(layer.offset)} mm`;
     groups.push(
       `  <g id="capa-${index + 1}">\n` +
         `    <path d="${d}" fill="none" stroke="#000000" stroke-width="0.1" fill-rule="evenodd"/>\n` +
@@ -149,7 +149,7 @@ export function planformSvg(layers: readonly SolidLayer[], title: string): strin
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(totalWidth)}mm" height="${fmt(totalHeight)}mm" viewBox="0 0 ${fmt(totalWidth)} ${fmt(totalHeight)}">\n` +
-    `  <title>${escapeXml(title)} · planta a escala 1:1 (mm), morro hacia arriba</title>\n` +
+    `  <title>${escapeXml(title)} · piezas a escala 1:1 (mm)</title>\n` +
     `${groups.join("\n")}\n${bar}\n</svg>\n`
   );
 }

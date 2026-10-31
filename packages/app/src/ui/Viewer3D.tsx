@@ -19,6 +19,10 @@ import { useAppStore } from "../state/store.ts";
 import { boxSizeInScene, frdToThree, rotationFrdToThree } from "../three/frames.ts";
 import { ExportButtons } from "./planform/ExportButtons.tsx";
 import { PlanformBodies } from "./planform/PlanformBodies.tsx";
+import { PartMeshes } from "./parts/PartMeshes.tsx";
+import { getMesh } from "../parts/meshStore.ts";
+import type { ImportedPart } from "../parts/model.ts";
+import { placedTriangles, trianglesBox } from "../parts/transform.ts";
 import { analysisFor, usePlanformAnalysis } from "./planform/usePlanformAnalysis.ts";
 import type { PlanformAnalysis } from "../planform/geometry.ts";
 
@@ -248,6 +252,7 @@ function contentOf(
   components: readonly MassComponent[],
   analysis: PlanformAnalysis,
   show: { readonly planform: boolean; readonly mass: boolean },
+  parts: readonly ImportedPart[] = [],
 ): Content {
   const min = new THREE.Vector3(Infinity, Infinity, Infinity);
   const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
@@ -262,13 +267,18 @@ function contentOf(
       add([p[0] + 0.02, p[1] + 0.02, p[2] + 0.02]);
     }
   }
-  if (show.planform && analysis.bounds !== null) {
-    const zs = [
-      ...analysis.layers.flatMap((l) => [l.z - l.thickness / 2, l.z + l.thickness / 2]),
-      ...analysis.rotors.map((r) => r.z),
-    ];
-    const b = analysis.bounds;
-    for (const x of [b.minX, b.maxX]) for (const y of [b.minY, b.maxY]) for (const z of zs) add(frdToThree([x, y, z]));
+  if (show.planform && analysis.box !== null) {
+    const b = analysis.box;
+    for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) add(frdToThree([x, y, z]));
+  }
+  if (show.planform) {
+    for (const part of parts) {
+      const mesh = getMesh(part.meshKey);
+      const box = mesh === undefined ? null : trianglesBox(placedTriangles(part, mesh));
+      if (box === null) continue;
+      add(frdToThree(box.min));
+      add(frdToThree(box.max));
+    }
   }
   if (!Number.isFinite(min.x)) {
     add([-0.05, -0.05, -0.05]);
@@ -307,7 +317,7 @@ function FitCamera({ token, radius }: { token: string; radius: number }) {
 
     // Latest state, not the deferred analysis: a template applied a moment ago is framed whole.
     const state = useAppStore.getState();
-    const { center: c, radius: r } = contentOf(state.model.components, analysisFor(state.planform), state.show3d);
+    const { center: c, radius: r } = contentOf(state.model.components, analysisFor(state.planform), state.show3d, state.parts);
     const direction = new THREE.Vector3(0.8, 0.65, 1.0).normalize();
     // The sphere must fit the narrower of the two fields of view: in a tall
     // pane (split view) that is the horizontal one.
@@ -337,6 +347,9 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
   const planform = useAppStore((s) => s.planform);
   const planSelectedId = useAppStore((s) => s.planSelectedId);
   const selectPlanElement = useAppStore((s) => s.selectPlanElement);
+  const parts = useAppStore((s) => s.parts);
+  const partSelectedId = useAppStore((s) => s.partSelectedId);
+  const selectPart = useAppStore((s) => s.selectPart);
   const show = useAppStore((s) => s.show3d);
   const setShow = useAppStore((s) => s.setShow3d);
   const fitRequest = useAppStore((s) => s.fitRequest);
@@ -348,7 +361,7 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
   const mass = massOutcome?.ok === true ? massOutcome.result.value : null;
   const cg: Triple = mass === null ? [0, 0, 0] : frdToThree(toTriple(mass.centerOfGravity.value));
 
-  const content = useMemo(() => contentOf(components, analysis, show), [components, analysis, show]);
+  const content = useMemo(() => contentOf(components, analysis, show, parts), [components, analysis, show, parts]);
 
   const extent = content.radius;
   const groundY = Math.min(0, content.lowest) - 0.01;
@@ -376,6 +389,7 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
         onPointerMissed={() => {
           select(null);
           selectPlanElement(null);
+          selectPart(null);
         }}
         aria-label="Visor 3D del aparato"
       >
@@ -405,6 +419,9 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
             onSelect={selectPlanElement}
           />
         )}
+        {show.planform && parts.length > 0 && (
+          <PartMeshes parts={parts} selectedId={partSelectedId} color={palette.part} accent={palette.accent} onSelect={selectPart} />
+        )}
         {show.mass && components.map((c) => (
           <Part key={c.id} component={c} selected={c.id === selectedId} palette={palette} onSelect={select} />
         ))}
@@ -420,7 +437,7 @@ export function Viewer3D({ theme }: { theme: "light" | "dark" }) {
       <div className="viewer-tools" data-tour="viewer-tools">
         <label className="inline check">
           <input type="checkbox" checked={show.planform} onChange={(e) => setShow({ planform: e.target.checked })} />
-          <span>Planta en 3D</span>
+          <span>Dibujo y piezas STL</span>
         </label>
         <label className="inline check">
           <input type="checkbox" checked={show.mass} onChange={(e) => setShow({ mass: e.target.checked })} />

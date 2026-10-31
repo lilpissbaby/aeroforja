@@ -1,0 +1,19 @@
+{
+  "name": "@aeroforja/mcp",
+  "version": "0.2.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "MCP server for Claude Desktop: Claude designs, renders and tests drones in AeroForja, live in the web app.",
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.ts",
+    "install-claude": "node --disable-warning=ExperimentalWarning src/install.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aeroforja/physics": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}

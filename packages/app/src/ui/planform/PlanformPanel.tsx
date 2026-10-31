@@ -7,11 +7,12 @@ import {
   WING_PRESETS,
   frameElements,
   frameParamsProblems,
-  wingElement,
+  wingElements,
   wingParamsProblems,
   type FrameParams,
   type WingParams,
 } from "../../planform/templates.ts";
+import { PLANE_SPECS, PLANES } from "../../planform/planes.ts";
 import { mm1 } from "../../planform/view.ts";
 import { useAppStore } from "../../state/store.ts";
 import { fromDegrees, fromMillimeters, toDegrees, toMillimeters } from "../../units/display.ts";
@@ -58,7 +59,7 @@ function ElementList() {
             </span>
             <span className="num role-tag">
               {ROLE_LABELS[e.role].replace(" (disco)", "")}
-              {e.mirror ? " ×2" : ""}
+              {e.mirror ? " ×2" : ""} · {PLANE_SPECS[e.plane].label.toLowerCase()}
             </span>
             <span className="meta num">{summary(e)}</span>
           </button>
@@ -188,6 +189,7 @@ function WingTemplate() {
     rootLeadingEdgeX: toMillimeters(p.rootLeadingEdgeX),
     thickness: toMillimeters(p.thickness),
     z: toMillimeters(p.z),
+    finHeight: toMillimeters(p.finHeight),
   });
   const [v, setV] = useState(toDisplay(DEFAULT_WING));
   const [problems, setProblems] = useState<string[]>([]);
@@ -201,16 +203,17 @@ function WingTemplate() {
       rootLeadingEdgeX: fromMillimeters(v.rootLeadingEdgeX),
       thickness: fromMillimeters(v.thickness),
       z: fromMillimeters(v.z),
+      finHeight: fromMillimeters(v.finHeight),
     };
     const found = wingParamsProblems(params);
     setProblems(found);
     if (found.length > 0) return;
     const store = useAppStore.getState();
     if (replace) {
-      store.setPlanform({ elements: [wingElement(params, EMPTY_PLANFORM)] });
+      store.setPlanform({ elements: wingElements(params, EMPTY_PLANFORM) });
       store.selectPlanElement(null);
     } else {
-      store.addPlanElements([wingElement(params, store.planform)]);
+      store.addPlanElements(wingElements(params, store.planform));
     }
     store.setPanel("planform");
     store.requestFit();
@@ -255,6 +258,7 @@ function WingTemplate() {
         {num("sweep", "Flecha b. ataque", "°")}
         {num("rootLeadingEdgeX", "x b. ataque raíz", "mm")}
         {num("thickness", "Espesor", "mm", 0)}
+        {num("finHeight", "Derivas de punta", "mm", 0)}
       </div>
       {problems.map((p) => (
         <p key={p} className="error-box">
@@ -269,20 +273,24 @@ function WingTemplate() {
           Añadir
         </button>
       </div>
-      <p className="hint">Media ala derecha con simetría: el reflejo se crea solo. Placa plana del espesor indicado.</p>
+      <p className="hint">
+        Media ala derecha con simetría: el reflejo se crea solo. Placa plana del espesor indicado. Las derivas de punta se
+        dibujan en el perfil (0 para ninguna).
+      </p>
     </details>
   );
 }
 
 export function PlanformPanel() {
-  const count = useAppStore((s) => s.planform.elements.length);
+  const elements = useAppStore((s) => s.planform.elements);
   const analysis = usePlanformAnalysis();
+  const perPlane = PLANES.map((p) => `${elements.filter((e) => e.plane === p).length} ${PLANE_SPECS[p].label.toLowerCase()}`).join(" · ");
   return (
     <>
       <section className="panel-section">
-        <h2>Planta</h2>
+        <h2>Dibujo</h2>
         <div className="totals num">
-          <span>{count} elementos</span>
+          <span title={perPlane}>{elements.length} elementos</span>
           <span>{analysis.layers.length === 1 ? "1 capa" : `${analysis.layers.length} capas`}</span>
         </div>
       </section>

@@ -15,3 +15,5 @@ export type { Mat3 } from "./core/mat3.ts";
 export * from "./core/rotation.ts";
 export * from "./atmosphere/index.ts";
 export * from "./mass/index.ts";
+export * from "./aero/index.ts";
+export { luFactor, luSolve, type LuFactors } from "./core/linalg.ts";

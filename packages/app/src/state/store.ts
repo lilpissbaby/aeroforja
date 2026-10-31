@@ -6,17 +6,41 @@ import { create } from "zustand";
 import type { MassComponent, MassModel } from "@aeroforja/physics";
 import exampleJson from "../../../../examples/mass-model.example.json";
 import { parseMassModelJson } from "../model/massModelFile.ts";
+import { parsePartsJson } from "../parts/file.ts";
+import { putMesh } from "../parts/meshStore.ts";
+import type { ImportedPart } from "../parts/model.ts";
 import { newComponent, uniqueId, type ShapeKind } from "../model/newComponent.ts";
 import { parsePlanformJson } from "../planform/file.ts";
-import { uniqueElementId, translateElement, type Planform, type PlanformElement } from "../planform/model.ts";
+import { uniqueElementId, translateElement, type Planform, type PlanformElement, type PlanformRole } from "../planform/model.ts";
+import type { PlaneId } from "../planform/planes.ts";
 import { DEFAULT_FRAME, frameElements } from "../planform/templates.ts";
-import type { AirInput, ComputeResponse } from "../worker/protocol.ts";
+import type { SnapSetting } from "../planform/view.ts";
+import { DEFAULT_TUNNEL, type TunnelSettings } from "../tunnel/input.ts";
+import type { AirInput, ComputeResponse, TunnelResponse } from "../worker/protocol.ts";
 
 export type ThemeChoice = "system" | "light" | "dark";
-/** Which side panels are showing: the planform drawing or the mass model. */
-export type Panel = "planform" | "mass";
-/** Centre of the workbench: the 2D planform, the 3D viewer or both side by side. */
-export type ViewMode = "plan" | "3d" | "split";
+/** Which side panels are showing: the drawing, the mass model or the imported parts. */
+export type Panel = "planform" | "mass" | "parts";
+/**
+ * Centre of the workbench: one 2D view (planta, alzado, perfil), the
+ * planta beside the 3D model, the classic three views plus 3D, the 3D model
+ * alone, or the wind tunnel.
+ */
+export type ViewMode = "plan" | "front" | "side" | "split" | "three" | "3d" | "tunnel";
+
+export type Tool = "select" | "polygon" | "rect" | "circle";
+
+/** Settings shared by the editors of the three views. */
+export interface EditorSettings {
+  readonly tool: Tool;
+  /** Type of the next element drawn. */
+  readonly role: PlanformRole;
+  /** Draw new elements with their mirror image. */
+  readonly mirror: boolean;
+  readonly snap: SnapSetting;
+  /** View that gets the keyboard: the last one the pointer worked in. */
+  readonly activePlane: PlaneId;
+}
 
 /** Undo steps kept for the planform. */
 const HISTORY_LIMIT = 200;
@@ -34,11 +58,26 @@ export interface AppState {
   readonly planPast: readonly Planform[];
   readonly planFuture: readonly Planform[];
   readonly planSelectedId: string | null;
+  /** Parts imported from STL files, placed on the aircraft (mini-design 005). */
+  readonly parts: readonly ImportedPart[];
+  readonly partSelectedId: string | null;
   readonly panel: Panel;
   readonly view: ViewMode;
   readonly show3d: { readonly planform: boolean; readonly mass: boolean };
   /** Incremented to ask the 2D and 3D views to frame the whole drawing. */
   readonly fitRequest: number;
+  readonly editor: EditorSettings;
+  readonly tunnelSettings: TunnelSettings;
+  /** Latest sweep and whether one is on its way. */
+  readonly tunnel: {
+    readonly running: boolean;
+    readonly response: TunnelResponse | null;
+    readonly error: string | null;
+    /** What the sweep left out and why (Spanish). */
+    readonly notes: readonly string[];
+  };
+  /** Incremented to ask for a new sweep. */
+  readonly tunnelRequest: number;
   /** Step of the guided tour on screen, or null when the tour is closed. */
   readonly tourStep: number | null;
 
@@ -51,7 +90,13 @@ export interface AppState {
   setProjectName(name: string): void;
   setAir(patch: Partial<AirInput>): void;
   setTheme(theme: ThemeChoice): void;
-  loadProject(name: string, model: MassModel, planform: Planform): void;
+  loadProject(
+    name: string,
+    model: MassModel,
+    planform: Planform,
+    parts?: readonly ImportedPart[],
+    meshes?: ReadonlyMap<string, Float32Array>,
+  ): void;
   setResults(results: ComputeResponse): void;
   setFileError(message: string | null): void;
 
@@ -66,12 +111,20 @@ export interface AppState {
   removePlanElement(id: string): void;
   duplicatePlanElement(id: string): void;
   selectPlanElement(id: string | null): void;
+  addPart(part: ImportedPart, mesh: Float32Array): void;
+  updatePart(id: string, update: (p: ImportedPart) => ImportedPart): void;
+  removePart(id: string): void;
+  selectPart(id: string | null): void;
   undoPlan(): void;
   redoPlan(): void;
   setPanel(panel: Panel): void;
   setView(view: ViewMode): void;
   setShow3d(patch: Partial<AppState["show3d"]>): void;
   requestFit(): void;
+  setEditor(patch: Partial<EditorSettings>): void;
+  setTunnelSettings(patch: Partial<TunnelSettings>): void;
+  runTunnel(): void;
+  setTunnelState(patch: Partial<AppState["tunnel"]>): void;
   startTour(): void;
   setTourStep(step: number): void;
   endTour(): void;
@@ -85,6 +138,8 @@ interface Saved {
   readonly model: MassModel;
   readonly theme: ThemeChoice;
   readonly planform: Planform | null;
+  /** Parts without their triangles: those are in IndexedDB (parts/meshStore.ts). */
+  readonly parts?: readonly ImportedPart[];
 }
 
 /** A first-time workbench opens with a 5-inch quad X frame to edit. */
@@ -108,24 +163,27 @@ function loadSaved(): Saved | null {
     if (!parsed.ok) return null;
     const theme = data.theme === "light" || data.theme === "dark" ? data.theme : "system";
     const planform = data.planform === undefined || data.planform === null ? null : parsePlanformJson(data.planform);
+    const parts = parsePartsJson(data.parts ?? [], {});
     return {
       projectName: parsed.name,
       model: parsed.model,
       theme,
       planform: planform !== null && planform.ok ? planform.planform : null,
+      parts: parts.ok ? parts.parts : [],
     };
   } catch {
     return null;
   }
 }
 
-export function saveState(state: Pick<AppState, "projectName" | "model" | "theme" | "planform">): void {
+export function saveState(state: Pick<AppState, "projectName" | "model" | "theme" | "planform" | "parts">): void {
   try {
     const data: Saved = {
       projectName: state.projectName,
       model: state.model,
       theme: state.theme,
       planform: state.planform,
+      parts: state.parts,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
@@ -165,14 +223,21 @@ export const useAppStore = create<AppState>()((set) => ({
   planPast: [],
   planFuture: [],
   planSelectedId: null,
+  parts: saved?.parts ?? [],
+  partSelectedId: null,
   panel: "planform",
   view: "split",
   // The planform is what the workbench opens on; the mass pieces and CG are one click away.
   show3d: { planform: true, mass: false },
   fitRequest: 0,
+  editor: { tool: "select", role: "plate", mirror: true, snap: "auto", activePlane: "top" },
+  tunnelSettings: DEFAULT_TUNNEL,
+  tunnel: { running: false, response: null, error: null, notes: [] },
+  tunnelRequest: 0,
   tourStep: null,
 
-  select: (id) => set(id === null ? { selectedId: null } : { selectedId: id, planSelectedId: null, panel: "mass" }),
+  select: (id) =>
+    set(id === null ? { selectedId: null } : { selectedId: id, planSelectedId: null, partSelectedId: null, panel: "mass" }),
 
   updateComponent: (id, update) =>
     set((s) => ({
@@ -222,16 +287,20 @@ export const useAppStore = create<AppState>()((set) => ({
   setProjectName: (name) => set({ projectName: name }),
   setAir: (patch) => set((s) => ({ air: { ...s.air, ...patch } })),
   setTheme: (theme) => set({ theme }),
-  loadProject: (name, model, planform) =>
+  loadProject: (name, model, planform, parts = [], meshes = new Map()) => {
+    for (const [key, mesh] of meshes) putMesh(key, mesh);
     set((s) => ({
       ...withHistory(s, planform),
       projectName: name,
       model,
+      parts,
+      partSelectedId: null,
       selectedId: null,
       planSelectedId: null,
       fileError: null,
       fitRequest: s.fitRequest + 1,
-    })),
+    }));
+  },
   setResults: (results) => set({ results }),
   setFileError: (message) => set({ fileError: message }),
 
@@ -287,7 +356,27 @@ export const useAppStore = create<AppState>()((set) => ({
     }),
 
   selectPlanElement: (id) =>
-    set(id === null ? { planSelectedId: null } : { planSelectedId: id, selectedId: null, panel: "planform" }),
+    set(id === null ? { planSelectedId: null } : { planSelectedId: id, selectedId: null, partSelectedId: null, panel: "planform" }),
+
+  addPart: (part, mesh) => {
+    putMesh(part.meshKey, mesh);
+    set((s) => ({
+      parts: [...s.parts, part],
+      partSelectedId: part.id,
+      selectedId: null,
+      planSelectedId: null,
+      panel: "parts",
+      fitRequest: s.fitRequest + 1,
+    }));
+  },
+  updatePart: (id, update) => set((s) => ({ parts: s.parts.map((p) => (p.id === id ? update(p) : p)) })),
+  removePart: (id) =>
+    set((s) => ({
+      parts: s.parts.filter((p) => p.id !== id),
+      partSelectedId: s.partSelectedId === id ? null : s.partSelectedId,
+    })),
+  selectPart: (id) =>
+    set(id === null ? { partSelectedId: null } : { partSelectedId: id, selectedId: null, planSelectedId: null, panel: "parts" }),
 
   undoPlan: () =>
     set((s) => {
@@ -319,6 +408,10 @@ export const useAppStore = create<AppState>()((set) => ({
   setView: (view) => set({ view }),
   setShow3d: (patch) => set((s) => ({ show3d: { ...s.show3d, ...patch } })),
   requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+  setEditor: (patch) => set((s) => ({ editor: { ...s.editor, ...patch } })),
+  setTunnelSettings: (patch) => set((s) => ({ tunnelSettings: { ...s.tunnelSettings, ...patch } })),
+  runTunnel: () => set((s) => ({ tunnelRequest: s.tunnelRequest + 1 })),
+  setTunnelState: (patch) => set((s) => ({ tunnel: { ...s.tunnel, ...patch } })),
   startTour: () => set({ tourStep: 0 }),
   setTourStep: (step) => set({ tourStep: step }),
   endTour: () => set({ tourStep: null }),

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { meters } from "@aeroforja/physics";
 import example from "../../../examples/mass-model.example.json";
+import { fromBody, localToBody, toBody } from "../src/planform/planes.ts";
 import {
   analysePlanform,
+  projectToView,
   centroid,
   circleRing,
   circleSegments,
@@ -17,8 +19,8 @@ import {
 import { layerGeometries, meshVolume, triangles } from "../src/planform/mesh.ts";
 import { binaryStl, planformSvg, stlTriangles } from "../src/planform/export.ts";
 import { parsePlanformJson } from "../src/planform/file.ts";
-import { planPoint, type Planform, type PlanformElement } from "../src/planform/model.ts";
-import { DEFAULT_FRAME, DEFAULT_WING, WING_PRESETS, armAngles, frameElements, wingElement } from "../src/planform/templates.ts";
+import { planePoint, type Planform, type PlanformElement } from "../src/planform/model.ts";
+import { DEFAULT_FRAME, DEFAULT_WING, WING_PRESETS, armAngles, frameElements, wingElement, wingElements } from "../src/planform/templates.ts";
 import { parseProjectJson, toProjectFile } from "../src/model/projectFile.ts";
 import { parseMassModelJson } from "../src/model/massModelFile.ts";
 
@@ -35,10 +37,11 @@ const plate = (id: string, points: [number, number][], extra: Partial<PlanformEl
     name: id,
     role: "plate",
     shape: "polygon",
+    plane: "top",
     mirror: false,
     thickness: meters(0.003),
-    z: meters(0),
-    points: points.map(([x, y]) => planPoint(x, y)),
+    offset: meters(0),
+    points: points.map(([x, y]) => planePoint(x, y)),
     ...extra,
   }) as PlanformElement;
 
@@ -48,10 +51,11 @@ const circle = (id: string, x: number, y: number, r: number, extra: Partial<Plan
     name: id,
     role: "hole",
     shape: "circle",
+    plane: "top",
     mirror: false,
     thickness: meters(0.003),
-    z: meters(0),
-    center: planPoint(x, y),
+    offset: meters(0),
+    center: planePoint(x, y),
     radius: meters(r),
     ...extra,
   }) as PlanformElement;
@@ -124,7 +128,7 @@ describe("planform analysis", () => {
     expect(through.layers[0]!.holeIds).toEqual(["hueco"]);
     expect(through.issues).toEqual([]);
 
-    const above = analysePlanform({ elements: [sheet, circle("hueco", 0, 0, 0.01, { z: meters(-0.02) })] });
+    const above = analysePlanform({ elements: [sheet, circle("hueco", 0, 0, 0.01, { offset: meters(-0.02) })] });
     expect(above.layers[0]!.area).toBeCloseTo(0.01, 12);
     expect(above.issues.map((i) => i.level)).toEqual(["amber"]);
   });
@@ -135,8 +139,8 @@ describe("planform analysis", () => {
       [0.05, -0.05],
       [0.05, 0.05],
       [-0.05, 0.05],
-    ], { z: meters(0.01) });
-    const a = analysePlanform({ elements: [sheet, circle("hueco", 0.01, 0.02, 0.008, { z: meters(0.0105) })] });
+    ], { offset: meters(0.01) });
+    const a = analysePlanform({ elements: [sheet, circle("hueco", 0.01, 0.02, 0.008, { offset: meters(0.0105) })] });
     const layer = a.layers[0]!;
     const volume = layerGeometries(layer).reduce((s, g) => s + meshVolume(triangles(g)), 0);
     expect(volume).toBeGreaterThan(0);
@@ -179,8 +183,9 @@ describe("planform analysis", () => {
       [0.05, 0.2],
     ]);
     const planform: Planform = { elements: [a, b] };
-    expect(elementAtPoint(planform, ["a", "b"], [0.02, 0.02])).toBe("a");
-    expect(elementAtPoint(planform, ["a", "b"], [0.07, 0.07])).toBe("b");
+    const layer = analysePlanform(planform).layers[0]!;
+    expect(elementAtPoint(planform, layer, [0.02, 0.02, 0])).toBe("a");
+    expect(elementAtPoint(planform, layer, [0.07, 0.07, 0])).toBe("b");
   });
 });
 
@@ -278,7 +283,116 @@ describe("planform and project files", () => {
     if (!mass.ok) throw new Error(mass.message);
     const planform: Planform = { elements: [wingElement(DEFAULT_WING, { elements: [] })] };
     const file = JSON.parse(JSON.stringify(toProjectFile("Mi ala", mass.model, planform))) as unknown;
-    expect(parseProjectJson(file, "otro")).toEqual({ ok: true, name: "Mi ala", model: mass.model, planform });
+    expect(parseProjectJson(file, "otro")).toEqual({ ok: true, name: "Mi ala", model: mass.model, planform, parts: [], meshes: new Map() });
     expect(parseProjectJson({ kind: "aeroforja.project", schemaVersion: 7 }, "x")).toMatchObject({ ok: false });
+  });
+});
+
+describe("three views: planta, alzado y perfil", () => {
+  const det = (m: readonly number[]): number =>
+    m[0]! * (m[4]! * m[8]! - m[5]! * m[7]!) - m[1]! * (m[3]! * m[8]! - m[5]! * m[6]!) + m[2]! * (m[3]! * m[7]! - m[4]! * m[6]!);
+
+  it("maps every plane to body axes with a proper rotation", () => {
+    for (const plane of ["top", "side", "front"] as const) {
+      expect(det(localToBody(plane))).toBe(1);
+      const p = toBody(plane, 0.1, 0.2, 0.3);
+      expect(fromBody(plane, p)).toEqual({ u: 0.1, v: 0.2, offset: 0.3 });
+    }
+    expect(toBody("side", 0.1, -0.05, 0.4)).toEqual([0.1, 0.4, -0.05]);
+    expect(toBody("front", 0.3, 0.02, -0.1)).toEqual([-0.1, 0.3, 0.02]);
+  });
+
+  it("opens planta-only elements of project files v2", () => {
+    const legacy = {
+      elements: [{ id: "p", name: "p", role: "plate", shape: "circle", mirror: false, thickness: 0.003, z: -0.01, center: { x: 0.02, y: 0.03 }, radius: 0.01 }],
+    };
+    const parsed = parsePlanformJson(legacy);
+    expect(parsed.ok && parsed.planform.elements[0]).toMatchObject({ plane: "top", offset: -0.01, center: { u: 0.02, v: 0.03 } });
+  });
+
+  it("a fin drawn in the perfil with symmetry is two vertical sheets at ±y, each a closed solid", () => {
+    const fin = plate("deriva", [
+      [0, 0],
+      [-0.1, 0],
+      [-0.1, -0.08],
+      [-0.05, -0.08],
+    ], { plane: "side", role: "wing", mirror: true, offset: meters(0.4) });
+    const a = analysePlanform({ elements: [fin] });
+    expect(a.layers.map((l) => [l.plane, l.offset])).toEqual([
+      ["side", -0.4],
+      ["side", 0.4],
+    ]);
+    const area = (0.1 + 0.05) / 2 * 0.08;
+    for (const layer of a.layers) {
+      const volume = layerGeometries(layer).reduce((s, g) => s + meshVolume(triangles(g)), 0);
+      // float32 vertices 0,4 m from the origin carry ~2·10⁻⁸ m of rounding on a 3 mm thickness.
+      expect(Math.abs(volume / (area * 0.003) - 1)).toBeLessThan(1e-5);
+    }
+    expect(a.box!.min[1]).toBeCloseTo(-0.4015, 9);
+    expect(a.box!.max[1]).toBeCloseTo(0.4015, 9);
+    expect(a.box!.min[2]).toBeCloseTo(-0.08, 9);
+    expect(a.vertical).toMatchObject({ count: 2, height: 0.08 });
+    expect(a.vertical!.area).toBeCloseTo(2 * area, 12);
+    expect(a.wing).toBeNull();
+  });
+
+  it("projects a sheet into the other views as the rectangle of its extent and thickness", () => {
+    const ring: Ring = [
+      [0, -0.1],
+      [0.05, -0.1],
+      [0.05, 0.1],
+      [0, 0.1],
+    ];
+    // A planta plate 50 × 200 mm, 3 mm thick at z = 0, seen from the front: y from −0.1 to 0.1, z ±1.5 mm.
+    expect(projectToView("top", ring, 0, 0.003, "front")).toEqual([
+      [-0.1, -0.0015],
+      [0.1, -0.0015],
+      [0.1, 0.0015],
+      [-0.1, 0.0015],
+    ]);
+    const a = analysePlanform({ elements: [plate("p", ring.map((p) => [p[0], p[1]] as [number, number]))] });
+    expect(a.frontalArea).toBeCloseTo(0.2 * 0.003, 12);
+    expect(a.projectedArea).toBeCloseTo(0.05 * 0.2, 12);
+  });
+
+  it("finds a horizontal propeller that would hit a vertical fin", () => {
+    const fin = plate("deriva", [
+      [0.05, 0.01],
+      [-0.05, 0.01],
+      [-0.05, -0.05],
+      [0.05, -0.05],
+    ], { plane: "side", offset: meters(0) });
+    const prop = circle("helice", 0, 0, 0.06, { role: "rotor", offset: meters(-0.02) });
+    const hit = analysePlanform({ elements: [fin, prop] });
+    expect(hit.issues.some((i) => i.level === "red" && i.elementId === "helice" && /perfil/.test(i.message))).toBe(true);
+    const clear = analysePlanform({ elements: [fin, circle("helice", 0, 0, 0.06, { role: "rotor", offset: meters(-0.06) })] });
+    expect(clear.issues.filter((i) => i.level === "red")).toEqual([]);
+  });
+
+  it("a pusher propeller in the alzado is a disc with its axis along x", () => {
+    const pusher = circle("pusher", 0, 0, 0.0635, { role: "rotor", plane: "front", offset: meters(-0.2) });
+    const a = analysePlanform({ elements: [pusher] });
+    expect(a.rotors).toHaveLength(1);
+    expect(a.rotors[0]!.center3).toEqual([-0.2, 0, 0]);
+    expect(a.box!.min).toEqual([-0.2, -0.0635, -0.0635]);
+  });
+
+  it("the wing template can add tip fins in the perfil", () => {
+    const flyingWing = WING_PRESETS.find((p) => p.id === "flying-wing-800")!.params;
+    const elements = wingElements(flyingWing, { elements: [] });
+    expect(elements.map((e) => e.plane)).toEqual(["top", "side"]);
+    const a = analysePlanform({ elements });
+    expect(a.vertical?.count).toBe(2);
+    expect(a.wing!.area).toBeCloseTo(0.16, 9);
+    expect(a.issues).toEqual([]);
+  });
+
+  it("the SVG names the view and the offset axis of each sheet", () => {
+    const fin = plate("deriva", [
+      [0, 0],
+      [-0.1, 0],
+      [-0.1, -0.08],
+    ], { plane: "side", offset: meters(0.1) });
+    expect(planformSvg(analysePlanform({ elements: [fin] }).layers, "x")).toContain("perfil · espesor 3,0 mm · y 100,0 mm");
   });
 });
