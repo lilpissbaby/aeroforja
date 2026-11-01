@@ -35,6 +35,9 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 | 2026-11-01 | Adelantar el túnel CFD (nivel 2, v2) y el ensayo de ráfaga 1−cos con flexión del ala (MVP/v1), con la puerta 1 aún abierta | mupsim | No dependen de la propulsión pendiente; cada uno con su mini-diseño (006 y 007) y sus tests antes de darlo por bueno. La ráfaga, solo ala fija hasta que existan propulsión y 6DOF |
 | 2026-11-01 | CFD por Lattice Boltzmann D3Q19 en WebGPU, no por método de paneles 3D | mupsim | Un método de paneles daría Cp falso detrás de brazos, cámara y batería (sin separación) |
 | 2026-11-01 | Sin corte de densidad en el CFD: se muestra Cp | Claude | A M < 0,1 la densidad cambia < 0,5 %; en LBM la densidad de red es la presión. No cambia resultados |
+| 2026-11-01 | Mini-diseño 006 (túnel CFD) aprobado tal cual | mupsim | Regularizada + Smagorinsky C_s = 0,17; fuerzas en ámbar como máximo; 2 M celdas |
+| 2026-11-01 | Mini-diseño 007 (ráfaga y flexión) aprobado tal cual | mupsim | VLM no estacionario; U_ds = 2 m/s, H = 12,5 c̄; sin alivio inercial hasta medir la masa por área |
+| 2026-11-01 | Orden: primero el CFD (sirve a ala fija y multirrotor), después la ráfaga | mupsim | Va a probar los dos tipos de dron |
 
 ## Abiertas
 
@@ -47,6 +50,4 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 - Nombre definitivo (AeroForja es provisional).
 - Aprobar las tolerancias de validación del túnel ajustadas el 31-10-2026 (mini-diseño 004, sección final).
 - Datos de Pelletier y Mueller (2000) para validar las alas de placa plana a bajo Reynolds frente a ensayo.
-- Aprobar el mini-diseño 006 (túnel CFD): colisión regularizada + Smagorinsky C_s = 0,17, fuerzas nunca en verde, tolerancias y caja.
-- Aprobar el mini-diseño 007 (ráfaga y flexión): ráfaga por defecto U_ds = 2 m/s y H = 12,5 c̄, modo no estacionario, tolerancias.
 - Módulo E, resistencia a flexión y masa por área de tu DM de 3 mm (ensayos §5.1 y §5.2 del módulo de fabricación) para la flecha y el alivio inercial.

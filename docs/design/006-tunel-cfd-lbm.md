@@ -1,6 +1,6 @@
 # Mini-diseño 006 · Túnel CFD (Lattice Boltzmann D3Q19 en WebGPU)
 
-Estado: **propuesto** (01-11-2026), pendiente de aprobación. El adelanto lo decidió mupsim el 01-11-2026: es el nivel 2 de la sección 10 de la especificación, que estaba en la v2. Él eligió Lattice Boltzmann frente a un método de paneles 3D.
+Estado: **aprobado** (01-11-2026) por mupsim, tal cual: colisión regularizada con Smagorinsky C_s = 0,17, fuerzas en ámbar como máximo, caja y 2 M celdas por defecto, y las tolerancias de los casos 1 a 7. El adelanto lo decidió mupsim el 01-11-2026: es el nivel 2 de la sección 10 de la especificación, que estaba en la v2. Él eligió Lattice Boltzmann frente a un método de paneles 3D.
 
 ## Qué responde
 

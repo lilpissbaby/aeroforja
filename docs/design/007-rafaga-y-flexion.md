@@ -1,6 +1,6 @@
 # Mini-diseño 007 · Ensayo de ráfaga: factor de carga, sustentación extra y flexión del ala
 
-Estado: **propuesto** (01-11-2026), pendiente de aprobación. El adelanto lo decidió mupsim el 01-11-2026. Junta dos piezas de fases posteriores: la ráfaga discreta 1−cos del entorno del simulador (especificación §11, MVP) y la comprobación estructural de la raíz del ala (especificación §12, v1).
+Estado: **aprobado** (01-11-2026) por mupsim, tal cual: VLM no estacionario por defecto, ráfaga por defecto U_ds = 2 m/s hacia arriba con H = 12,5 c̄, sin alivio inercial hasta tener la masa por área, y las tolerancias de los casos 1 a 8. El adelanto lo decidió mupsim el 01-11-2026. Junta dos piezas de fases posteriores: la ráfaga discreta 1−cos del entorno del simulador (especificación §11, MVP) y la comprobación estructural de la raíz del ala (especificación §12, v1).
 
 ## Qué responde
 
