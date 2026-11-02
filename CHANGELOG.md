@@ -2,6 +2,15 @@
 
 Formato: una entrada por entrega, lo más nuevo arriba. Cada cambio que afecta a resultados físicos enlaza su mini-diseño.
 
+## 0.7.0 · 02-11-2026
+
+- **Túnel CFD** ([mini-diseño 006](docs/design/006-tunel-cfd-lbm.md)), adelantado de la v2: Lattice Boltzmann D3Q19 en WebGPU sobre todo el cuerpo 3D del dron. Da Cp en la piel (medio e instantáneo), humo, líneas de corriente, cortes de Cp, velocidad y vorticidad con la rejilla, balanza media junto al VLM y «Validar en tu GPU». Validado frente a Taylor–Green, Schäfer–Turek y GPU = CPU.
+- **Ensayo de ráfaga** ([mini-diseño 007](docs/design/007-rafaga-y-flexion.md)), adelantado del MVP/v1: ráfaga 1 − cos con VLM no estacionario, movimiento vertical y de cabeceo, y flexión de la semiala como viga, con el ala deformada sobre la banda de la ráfaga y la ráfaga crítica. Validado frente a Jones, Küssner, Pratt–Walker y fórmulas de viga.
+- Tour guiado con 4 pasos nuevos (29 en total) y secciones 14 y 15 del README.
+- La vista de los túneles CFD y de ráfaga usa todo el ancho.
+- `pnpm test:slow` y `pnpm test:gpu`.
+- **Pendiente de aprobación**: la entrada del CFD toma la densidad de la celda interior (mini-diseño 006) y el caso de Küssner compara la sección central desde τ = 4 (mini-diseño 007).
+
 ## 0.6.0 · 31-10-2026
 
 - **Tres vistas**: el dibujo pasa de planta sola a planta, perfil y alzado, con siluetas de las otras vistas, enganche a sus esquinas y la vista «Tres vistas + 3D». Archivos de proyecto v3; los v2 y v1 se siguen abriendo.

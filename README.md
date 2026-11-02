@@ -34,6 +34,8 @@ Diseñar, ensayar en un túnel virtual y volar en 3D drones antes de fabricarlos
 - [11. Túnel de viento virtual](#11-túnel-de-viento-virtual)
 - [12. Piezas STL](#12-piezas-stl)
 - [13. Diseñar con Claude Desktop](#13-diseñar-con-claude-desktop)
+- [14. Túnel CFD](#14-túnel-cfd)
+- [15. Ensayo de ráfaga](#15-ensayo-de-ráfaga)
 - [Calidad: validación y pruebas](#calidad-validación-y-pruebas)
 - [Atajos de teclado y ratón](#atajos-de-teclado-y-ratón)
 - [Despliegue](#despliegue)
@@ -76,7 +78,7 @@ La primera vez se abre un **tour guiado** que recorre toda la pantalla. La app a
 
 <img src="docs/img/03-tour-bienvenida.png" alt="Primera tarjeta del tour guiado, centrada sobre la app oscurecida" width="800">
 
-El tour se abre solo la primera vez que entras y, después, con el botón **Tour guiado** de la barra superior. Son 22 pasos: oscurece la pantalla, ilumina una zona y la explica en una tarjeta al lado. Cuando hace falta cambia de vista o selecciona algo para enseñártelo, y al terminar deja la vista, el panel y la selección como estaban. No modifica tu diseño.
+El tour se abre solo la primera vez que entras y, después, con el botón **Tour guiado** de la barra superior. Son 29 pasos: oscurece la pantalla, ilumina una zona y la explica en una tarjeta al lado. Cuando hace falta cambia de vista o selecciona algo para enseñártelo, y al terminar deja la vista, el panel y la selección como estaban. No modifica tu diseño.
 
 <img src="docs/img/04-tour-herramientas.png" alt="Paso 9 del tour: la barra de herramientas del plano iluminada y su explicación al lado" width="800">
 
@@ -86,7 +88,7 @@ El tour se abre solo la primera vez que entras y, después, con el botón **Tour
 | <kbd>←</kbd> o «Anterior» | paso anterior |
 | <kbd>Esc</kbd> o «Salir del tour» | cerrar |
 
-Recorre, en orden: proyecto, aire, tour y tema, pestañas Planta/Masas, lista de elementos, plantillas, vistas, herramientas, plano cartesiano, cómo dibujar, cómo editar, barra de estado, propiedades, visor 3D y sus opciones, resultados, archivos para el taller, modelo de masas, propiedades de una pieza, guardar y abrir, y un resumen de atajos.
+Recorre, en orden: proyecto, aire, tour y tema, pestañas Planta/Masas, lista de elementos, plantillas, vistas, herramientas, plano cartesiano, cómo dibujar, cómo editar, barra de estado, propiedades, visor 3D y sus opciones, resultados, archivos para el taller, piezas STL, túnel de viento, túnel CFD (ensayo y visor de presión, humo y cortes), ensayo de ráfaga (ajustes y resultados), Claude Desktop, modelo de masas, propiedades de una pieza, guardar y abrir, y un resumen de atajos.
 
 ---
 
@@ -217,7 +219,9 @@ Arriba del centro eliges la vista:
 | **Tres vistas + 3D** | Planta, perfil y alzado juntos con el modelo 3D, como un plano de tres vistas |
 | **Planta + 3D** | La planta junto al modelo |
 | **3D** | Solo el modelo |
-| **Túnel de viento** | El ensayo virtual (sección 11) |
+| **Túnel de viento** | El ensayo virtual de barridos (sección 11) |
+| **Túnel CFD** | El flujo alrededor de todo el cuerpo 3D en la tarjeta gráfica (sección 14) |
+| **Ráfaga** | Factor de carga y flexión del ala en una ráfaga 1 − cos (sección 15) |
 
 ![Las tres vistas y el 3D de un ala volante con derivas de punta](docs/img/50-tres-vistas.png)
 
@@ -583,11 +587,68 @@ Guía completa, herramientas, privacidad y límites: [`docs/claude-desktop.md`](
 
 ---
 
+## 14. Túnel CFD
+
+El flujo alrededor de **todo el cuerpo 3D** del dron tal como está dibujado: las placas de las tres vistas, las piezas STL y, si quieres, los bloques del modelo de masas. Se calcula en tu tarjeta gráfica con WebGPU (Chrome, Edge o Firefox). Mini-diseño [006](docs/design/006-tunel-cfd-lbm.md).
+
+![Túnel CFD: el ala volante coloreada por Cp, el humo del peine y el corte de presión](docs/img/60-tunel-cfd.png)
+
+*La captura está hecha con la resolución «vista previa» y una tarjeta gráfica emulada. Con 0,15 M celdas, la placa de 3 mm sale casi 10 veces más gruesa y la cuerda media solo tiene 7 celdas, así que la balanza sale en **rojo** y la resistencia no vale. Es lo que la app tiene que decir. Con 2 M u 8 M celdas en tu GPU la cosa cambia.*
+
+**Qué calcula y cómo**: Lattice Boltzmann D3Q19 con colisión BGK regularizada (Latt y Chopard) y LES de Smagorinsky (Hou et al., C_s = 0,17), en FP32 con distribuciones desplazadas. Las paredes van por rebote a mitad de enlace sobre el dron voxelizado, y la entrada y el campo lejano por equilibrio. Las fuerzas salen por intercambio de momento (Mei et al.). El cuerpo queda fijo y alineado con la rejilla y el viento entra con α y β, así que tus placas planas son exactas en su plano. El Reynolds es el real del vuelo.
+
+**Qué ves**:
+
+- **La piel coloreada por Cp**, media de la última pasada o instantánea.
+- **Humo**: trazadores que salen de un peine delante del morro, con un color por altura, como en un túnel con humo.
+- **Líneas de corriente** del flujo medio, al terminar.
+- **Cortes** en x, y o z que mueves con un deslizador: Cp, velocidad o vorticidad, con la **rejilla de cálculo** visible.
+- **Balanza media de 6 componentes** con su oscilación y CL, CD y Cm junto a los del VLM al mismo α.
+- **Fuerzas frente al tiempo** y CSV.
+
+No hay corte de densidad: a la velocidad de un dron la densidad no cambia (en Lattice Boltzmann la densidad de la red es la presión, y eso es el corte de Cp).
+
+| Rejilla y validez | Vorticidad con la rejilla |
+|---|---|
+| ![Panel del túnel CFD: marcha, balanza, rejilla y validez](docs/img/61-tunel-cfd-resultado.png) | ![Corte de vorticidad con la rejilla de cálculo visible](docs/img/62-tunel-cfd-vorticidad.png) |
+
+**Resolución**: vista previa (0,15 M celdas), rápida (0,5 M), normal (2 M) y fina (8 M, unos 1,2 GB de VRAM). Con 2 M la celda mide unos 4,8 mm en un quad de 5" y 12,5 mm en un ala de 800 mm. Una placa más fina que la celda se engrosa a una celda, y el panel te dice cuánto.
+
+**Semáforo**: las fuerzas son **semicuantitativas** y se quedan en ámbar como mucho. Rojo si la pieza más pequeña o la cuerda media tiene menos de 8 celdas, si el bloqueo pasa del 5 % o si el cálculo se vuelve inestable. Las hélices van paradas: en un multirrotor en vuelo mandan sus estelas, y eso llegará con la propulsión.
+
+**Validar en tu GPU**: esfera a Re = 100 y esfera y cilindro a Re = 10⁵, con este mismo solver y en tu tarjeta. Pasar el caso a Re comparable no pone las fuerzas en verde.
+
+---
+
+## 15. Ensayo de ráfaga
+
+Tu ala fija (ala volante, delta o convencional) vuela recta a 1 g y entra en una **ráfaga vertical discreta 1 − cos**. Mini-diseño [007](docs/design/007-rafaga-y-flexion.md).
+
+![Ensayo de ráfaga: el ala sobre la banda de la ráfaga y las gráficas de carga](docs/img/63-rafaga.png)
+
+**Qué calcula y cómo**:
+
+- **Aerodinámica**: VLM no estacionario linealizado, con anillos de vórtice sobre los mismos paneles del túnel y una estela que se desprende y se convecta (Katz y Plotkin, cap. 13; Murua et al.). Cada panel encuentra la ráfaga en su x, así que la cola la nota después que el ala. Hay un modo casi estacionario para ver cuánto alivia el retraso de la sustentación.
+- **Vuelo**: movimiento vertical y de cabeceo con tu masa, tu CG y tu inercia, a velocidad constante (Wright y Cooper, cap. 16).
+- **Ala**: cada semiala como viga de Euler–Bernoulli con alivio inercial. Da el momento en la raíz y la tensión en la placa, σ = 6M/(c t²), y, **si das el módulo E de tu tablero**, la flecha y la primera frecuencia de flexión. La app no inventa E, ni la resistencia a flexión, ni la masa por área: los mides con los ensayos de pesada y de voladizo del módulo de fabricación o los tomas de la ficha, con su procedencia.
+
+**Qué ves**: n(t) con el máximo marcado, la ráfaga en el morro, ΔL, α y θ, el momento en la raíz, la tensión y la flecha. También la referencia de Pratt–Walker, el ala deformada sobre la banda de la ráfaga coloreada por su velocidad y, con «Con barrido de H», la **longitud de ráfaga crítica**.
+
+![Gráficas del ensayo de ráfaga: factor de carga, ráfaga, sustentación, ángulos, momento y barrido de H](docs/img/64-rafaga-graficas.png)
+
+**Por defecto**: U_ds = 2 m/s hacia arriba y H = 12,5 c̄ (la de Pratt y Walker). Es un escenario, no un dato. A 15 m/s, 2 m/s ya son 7,6° de α.
+
+**Semáforo**: rojo si α pasa de 10° (pérdida, no modelada), si el margen estático es ≤ 0 (la respuesta diverge) o si la flecha pasa del 10 % de la semienvergadura. Ámbar si la ráfaga es tan corta que el ala vibra o si el material es de ficha. **Multirrotores: todavía no**. Su respuesta a una ráfaga la deciden los rotores y la controladora, que llegan con la propulsión y el 6DOF.
+
+---
+
 ## Calidad: validación y pruebas
 
-Cada push pasa por GitHub Actions: TypeScript estricto en todos los paquetes, más de 300 tests y la build de producción.
+Cada push pasa por GitHub Actions: TypeScript estricto en todos los paquetes, más de 320 tests, los casos lentos de validación y la build de producción.
 
 - **Validación física** (`packages/validation`): atmósfera ISA frente a la tabla de ICAO Doc 7488, aire húmedo frente a ASHRAE, modelo de masas frente a sólidos homogéneos, mallas STL frente a fórmulas cerradas (error < 10⁻¹²), y el túnel frente al ejemplo 7.2 de Bertin y Cummings, Helmbold, la línea sustentadora y DATCOM. Cada caso con su fuente y su tolerancia explicada.
+- **CFD** (`packages/cfd-webgpu`): el solver de referencia en TypeScript frente al vórtice de Taylor–Green y al cilindro de Schäfer y Turek (2D-1, CD a +4,1 %, en `pnpm test:slow`); los kernels WGSL frente a ese solver (`pnpm test:gpu`, diferencia < 10⁻⁶); la esfera, a Re = 100 y a Re = 10⁵, en tu GPU. La esfera a Re = 100 **no pasa** con las resoluciones que caben en una tarjeta (≈ +20 % con 12 celdas de diámetro): es el límite de las paredes en escalera, explicado en el mini-diseño 006.
+- **Ráfaga**: el VLM no estacionario frente a las funciones de Jones (AR 3 y 6) y de Küssner, el límite estacionario frente al VLM, la solución analítica de la respuesta vertical, la fórmula de Pratt–Walker y la viga y su frecuencia frente a fórmulas cerradas.
 - **Tests de la app y del servidor MCP**: geometría de las tres vistas, booleanas, archivos v1–v3, STL, entrada del túnel (un ala entera y media ala simétrica dan la misma sustentación a 10⁻⁹) y el protocolo MCP por stdio de punta a punta.
 
 Lo que no está validado lo dice la app en ámbar o rojo, no en una nota al pie.
@@ -645,6 +706,8 @@ pnpm dev         # la app en http://localhost:5173 (se recarga sola al cambiar e
 pnpm build       # versión de producción en packages/app/dist
 pnpm preview     # sirve esa versión en http://localhost:4173
 pnpm test        # tests unitarios + validación física (Vitest)
+pnpm test:slow   # validación que tarda minutos: cilindro de Schäfer y Turek, funciones de Jones y Küssner
+pnpm test:gpu    # kernels WebGPU del CFD frente al solver de referencia (Chromium sin pantalla, necesita Playwright)
 pnpm typecheck   # TypeScript estricto en todos los paquetes
 pnpm check       # las dos cosas
 pnpm isa 1500        # atmósfera a 1 500 m geométricos, con método, supuestos y semáforo
@@ -679,11 +742,15 @@ packages/
                 atmósfera (ISA, humedad, condiciones medidas) y modelo de masas
                 y túnel (VLM, Trefftz, fricción, resistencia por componentes, masa de mallas)
                 (sin UI, sin APIs de navegador ni de Node)
+  cfd-webgpu/   túnel CFD: Lattice Boltzmann D3Q19 en WGSL, solver de referencia en TypeScript,
+                voxelizador, unidades y postproceso (sin UI)
   validation/   casos de referencia publicados, con fuente, cadena de transcripción y tolerancia
   app/          interfaz web (Vite + React + three.js); la física corre en un Web Worker
     src/planform/   dibujo en tres vistas: modelo, booleanas, plantillas, malla, STL/SVG
     src/parts/      piezas STL: lectura, colocación, proyecciones, masa
     src/tunnel/     del dibujo a la entrada del túnel
+    src/cfd/        del dibujo al túnel CFD, su trabajador WebGPU y su estado
+    src/gust/       del dibujo y las masas al ensayo de ráfaga
     src/bridge/     enlace en vivo con Claude Desktop
     src/ui/         paneles, editores de vista, visor 3D, túnel y tour guiado
   mcp/          servidor MCP para Claude Desktop (stdio) y puente local con la app
@@ -697,7 +764,7 @@ docker/         Dockerfile, nginx del contenedor, compose local y del VPS, conf 
 data/raw/       datos de terceros sin procesar (fuera de git)
 ```
 
-Vendrán `data/` procesado (hélices UIUC, perfiles, motores, baterías), `solvers-wasm/` y `cfd-webgpu/` según la hoja de ruta.
+Vendrán `data/` procesado (hélices UIUC, perfiles, motores, baterías) y `solvers-wasm/` según la hoja de ruta.
 
 ### Reglas del núcleo
 
@@ -716,7 +783,8 @@ Notas de diseño del editor de planta: [`docs/design/003-planta-2d-a-3d.md`](doc
 
 - **Masa de las piezas dibujadas**: el dibujo es solo geometría (las piezas STL sí tienen masa). Volumen × densidad medida llega con el banco de materiales (módulo de fabricación) y su mini-diseño.
 - **Aerodinámica de perfiles y hélices**: el túnel es de placas planas (VLM). Perfiles con XFOIL, BEMT de hélices con datos UIUC, superficies de mando y derivadas laterales: hoja de ruta.
-- **Vuelo**: todavía no hay simulación 6DOF ni motor/batería; el túnel da fuerzas y estabilidad estática, no dinámica.
+- **Vuelo**: todavía no hay simulación 6DOF ni motor/batería. El ensayo de ráfaga da la respuesta longitudinal de un ala fija sin mandos; los multirrotores, las ráfagas laterales y la turbulencia de Dryden llegan con el 6DOF.
+- **CFD**: semicuantitativo, sin hélices, sin refinamiento local de malla y sin modelo de pared; las fuerzas se quedan en ámbar.
 - **Perfil real del ala**: el 3D es una placa plana del espesor indicado (la técnica «placa plana» del módulo de fabricación). Costillas y perfiles, en la v1.
 - **Cotas editables, restricciones y variantes**: MVP.
 - **Kerf, anidado por plancha y DXF**: módulo de fabricación.

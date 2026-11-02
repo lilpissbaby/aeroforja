@@ -118,3 +118,42 @@ Hélices (disco actuador, cuando exista la propulsión), refinamiento local de m
 2. Que las fuerzas del CFD no lleguen nunca a verde en esta entrega (ámbar como máximo, aun pasando el caso 7).
 3. Tolerancias de los casos 1 a 7 tal como están arriba. Si al programar alguna no se cumple, no se afloja en silencio: te lo traigo con datos, como en el mini-diseño 004.
 4. Caja (0,5 L delante, 2 L detrás, 0,5 L a los lados, 0,6 L arriba y abajo) y 2 M celdas por defecto.
+
+## Lo que salió al programar (01/02-11-2026)
+
+Programado en `packages/cfd-webgpu`. Hay una corrección de método y un resultado de validación que te traigo, como en el mini-diseño 004.
+
+**Corrección de un borde (cambia resultados, pendiente de tu aprobación).** Con la entrada de equilibrio a `ρ = 1`, como estaba escrita, el caso de Schäfer y Turek no llegaba: el caudal que entraba al canal era un **7,3 % menor** que el impuesto y el CD salía un 7 % bajo (5,18 con D = 20 celdas). El motivo es que fijar a la vez la densidad y la velocidad en la entrada sobredetermina el borde: el fluido de dentro necesita algo más de presión para empujar, y el equilibrio a ρ = 1 se la quita. La solución es la habitual en LBM: la entrada y las caras de campo lejano imponen la velocidad y toman la densidad de la celda vecina de dentro, y la salida sigue a ρ = 1, que es la referencia de presión (Krüger et al. 2017, §5.3). Con eso el caudal coincide (error < 0,1 %) y el caso pasa. Ya está en el código y en los kernels.
+
+**Resultados de la validación:**
+
+| Caso | Pedido | Resultado |
+|---|---|---|
+| 1. Taylor–Green, τ = 0,6, 0,8 y 1,0 | ritmo de decaimiento ±1 % | pasa (test rápido) |
+| 2. Schäfer–Turek 2D-1, D = 20 celdas | CD y Δp ±5 % de la banda | CD = 5,821 (+4,1 %), Δp = 0,1165 Pa (−0,6 %). Pasa, con U_máx de red 0,05, el mismo Mach de red que el túnel. Con U_máx = 0,075 el CD sale +5,1 % (más compresibilidad de red): por eso el caso usa 0,05 |
+| 3. Esfera Re = 100 | CD 1,087 ±6 % | **no pasa**: ver abajo |
+| 4. GPU = CPU, 24 × 16 × 16, 300 pasos | \|Δu\| < 1·10⁻⁵, \|Δρ\| < 1·10⁻⁶ | \|Δu\| = 4,0·10⁻⁷, \|Δρ\| = 7,2·10⁻⁷, fuerza 2,4·10⁻⁵ relativa (adaptador SwiftShader). Pasa |
+| 5. Corriente uniforme 1000 pasos | precisión de máquina | < 1·10⁻¹³. Pasa |
+| 6. Unidades y voxelización | exactas | pasan |
+| 7. Re = 10⁵ en tu GPU | ±25 % | botón «Validar en tu GPU» |
+
+El caso 2 tarda unos 6 minutos en la CPU y va en `pnpm test:slow` (y en la integración continua). El 4 va en `pnpm test:gpu`, que abre un Chromium sin pantalla con WebGPU por software.
+
+**Esfera a Re = 100 (caso 3): no pasa, y te pido que decidas.** Lo he corrido en la CPU con el solver de referencia, que es el mismo algoritmo que la GPU:
+
+| D (celdas) | Caja | C_s | CD | Error |
+|---|---|---|---|---|
+| 6 | 12 × 8 × 8 D, centro a 2,5 D de la entrada | 0 | 1,631 | +50 % |
+| 6 | 20 × 12 × 12 D, centro a 6 D | 0 | 1,528 | +41 % |
+| 10 | 12 × 8 × 8 D, centro a 2,5 D | 0,17 | 1,408 | +30 % |
+
+La caja pequeña añade un 7 % (por confinamiento, porque a Re = 100 la perturbación llega lejos), así que el caso pasa a la caja grande. El grueso del error es de **resolución**: con el rebote a mitad de enlace la esfera es una escalera de cubos, y a Re = 100 la capa límite mide D/√Re ≈ 0,1 D, una celda con D = 10. El error baja más o menos como 1/D, de modo que el ±6 % pediría unas 40 celdas de diámetro: 800 × 480 × 480 celdas, imposible en una tarjeta normal. Me equivoqué al proponer D = 10–16 con ±6 %. El cilindro de Schäfer y Turek sí pasa porque a Re = 20 la capa límite tiene 4–5 celdas con D = 20.
+
+Además, el caso laminar corre ahora **sin Smagorinsky (C_s = 0)**: a Re = 100 no hay turbulencia que modelar, y con C_s = 0,17 la viscosidad de submalla de una rejilla tan gruesa añade otro 5 %. Los casos a Re = 10⁵ siguen con C_s = 0,17, como el túnel.
+
+Opciones:
+
+1. **Dejarlo como límite documentado.** El caso 3 pasa a ser de convergencia (el error tiene que bajar al subir D) y «Validar en tu GPU» lo corre con D = 12 en la caja grande y te enseña el error real, que será de un +20 % aproximadamente. No cambia el semáforo: las fuerzas ya estaban en ámbar como máximo.
+2. **Rebote interpolado en las paredes curvas** (Bouzidi, Firdaouss y Lallemand, *Phys. Fluids* 13, 2001): cada enlace usa la distancia real a la pared, no media celda. Es de segundo orden en paredes curvas y es lo que haría falta para que las piezas STL redondeadas tengan una resistencia creíble con pocas celdas. Es un cambio de método, con su propia validación (esta esfera, otra vez), para una entrega aparte.
+
+Lo que hay en el código ahora es la opción 1, a la espera de lo que decidas.

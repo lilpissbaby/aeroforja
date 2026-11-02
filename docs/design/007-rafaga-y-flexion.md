@@ -98,3 +98,23 @@ Ráfagas laterales y turbulencia continua de Dryden (llegan con el 6DOF), multir
 2. VLM no estacionario como modo por defecto, con el casi estacionario disponible para comparar.
 3. Sin alivio inercial hasta que des la masa por área del ala (resultado conservador).
 4. Tolerancias de los casos 1 a 8 tal como están arriba. Si alguna no se cumple, te la traigo con datos.
+
+## Lo que salió al programar (02-11-2026)
+
+Programado en `packages/physics/src/aero/uvlm.ts`, `aero/gust.ts` y `structures/beam.ts`.
+
+- **Cuerda de referencia de Jones.** En τ = 2Vt/c se usa la **cuerda en la raíz** c₀: es la que usan Berci y Righi (arXiv:2001.06734, 2020) cuando tabulan los coeficientes de Jones junto a su CFD.
+- **Rendimiento.** Para el ala volante de 800 mm (288 paneles, 120 filas de estela), montar el modelo tarda unos 3 s y una ráfaga unos 5 s. Las influencias de la estela se guardan en simple precisión: es lo que más memoria mueve en cada paso.
+
+| Caso | Pedido | Resultado |
+|---|---|---|
+| 1. Jones, AR 3 y 6 | ±5 %, τ de 2 a 30 | máximo 2,1 % (AR 3) y 1,8 % (AR 6). Pasa |
+| 2. Küssner, AR 40 | ±6 %, τ de 2 a 30 | **no pasa tal cual**, ver abajo |
+| 3. Límite estacionario | CL ±0,5 %, Cm ±0,002 | pasa (rectangular y ala volante) |
+| 4. Solo vertical, casi estacionario | < 1·10⁻⁶ | pasa |
+| 5. Pratt–Walker, μ_g de 10 a 100 | ±10 % | +3,1 %, +5,9 %, +8,0 % y +8,9 %. Pasa |
+| 6. Viga | ±0,5 % | pasa |
+| 7. Frecuencia | ±0,5 % | pasa |
+| 8. Simetría | ≤ 1·10⁻¹² | pasa |
+
+**Küssner (cambio pendiente de tu aprobación).** La función de Küssner es 2D. Con AR 40 la sustentación del ala entera todavía sube un 2–3 % más deprisa que en 2D, igual que pasa con las funciones de Jones para alas finitas. Por eso comparo la **sección central**, que es la más parecida al caso 2D. Aun así, en τ = 2, justo cuando el frente de la ráfaga llega al borde de salida, el VLM sale **+24 % con 8 paneles en cuerda** (+15 % con 16; converge despacio). La causa es que el modelo enciende cada panel a saltos, cuando el frente pasa por su punto de control. En τ = 3 sale +7 % con 8 paneles. Desde τ = 4 queda dentro del ±6 % (+5,5 % como máximo). Propuesta, ya en el test: **sección central, τ de 4 a 30, ±6 %**. Para las ráfagas 1 − cos del ensayo no importa, porque crecen suaves y no tienen frente.

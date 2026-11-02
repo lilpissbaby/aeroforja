@@ -1,6 +1,8 @@
 # Every push and pull request: strict types in every package, the unit and
-# physics validation tests, and the production build. A physics core that
-# fails its published reference cases does not reach main.
+# physics validation tests, the slow validation cases (CFD reference solver,
+# unsteady lattice), the WebGPU kernels against their reference, and the
+# production build. A physics core that fails its published reference cases
+# does not reach main.
 name: CI
 
 on:
@@ -21,3 +23,31 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  slow-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:slow
+
+  webgpu-kernels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Software WebGPU (SwiftShader) in a headless Chromium.
+      - run: npm i -g playwright && npx playwright install --with-deps chromium
+      - run: NODE_PATH=$(npm root -g) pnpm test:gpu

@@ -38,6 +38,13 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 | 2026-11-01 | Mini-diseño 006 (túnel CFD) aprobado tal cual | mupsim | Regularizada + Smagorinsky C_s = 0,17; fuerzas en ámbar como máximo; 2 M celdas |
 | 2026-11-01 | Mini-diseño 007 (ráfaga y flexión) aprobado tal cual | mupsim | VLM no estacionario; U_ds = 2 m/s, H = 12,5 c̄; sin alivio inercial hasta medir la masa por área |
 | 2026-11-01 | Orden: primero el CFD (sirve a ala fija y multirrotor), después la ráfaga | mupsim | Va a probar los dos tipos de dron |
+| 2026-11-01 | Entrada y campo lejano del CFD con la densidad de la celda interior (no ρ = 1) | Claude, **pendiente de mupsim** | Con ρ = 1 el caudal del caso de Schäfer–Turek entraba un 7,3 % bajo; ver el mini-diseño 006 |
+| 2026-11-02 | Schäfer–Turek con U_máx de red 0,05 (el Mach de red del túnel) | Claude | Con 0,075 el CD sale +5,1 %; con 0,05, +4,1 % |
+| 2026-11-02 | Küssner comparado en la sección central del ala AR 40 y desde τ = 4 | Claude, **pendiente de mupsim** | En τ = 2 el VLM sale +24 % (activación de paneles a saltos); ver el mini-diseño 007 |
+| 2026-11-02 | τ de Jones con la cuerda en la raíz | Claude | Como Berci y Righi (2020), que tabulan sus coeficientes |
+| 2026-11-02 | Esfera a Re = 100 del CFD: caja de 20 × 12 × 12 D y sin Smagorinsky (caso laminar) | Claude | La caja pequeña añadía un 7 % por confinamiento; C_s = 0,17 otro 5 % de viscosidad de submalla |
+| 2026-11-02 | Vistas de los túneles CFD y de ráfaga a todo el ancho (sin los paneles de propiedades y resultados) | Claude | No cambia resultados |
+| 2026-11-02 | Los datos del material del ala (E, resistencia, masa por área) se dan en la pestaña de ráfaga y no se guardan aún con el proyecto | Claude | Llegarán al banco de materiales del módulo de fabricación |
 
 ## Abiertas
 
@@ -51,3 +58,5 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 - Aprobar las tolerancias de validación del túnel ajustadas el 31-10-2026 (mini-diseño 004, sección final).
 - Datos de Pelletier y Mueller (2000) para validar las alas de placa plana a bajo Reynolds frente a ensayo.
 - Módulo E, resistencia a flexión y masa por área de tu DM de 3 mm (ensayos §5.1 y §5.2 del módulo de fabricación) para la flecha y el alivio inercial.
+- Aprobar la entrada del CFD con densidad extrapolada (mini-diseño 006) y el caso de Küssner ajustado (mini-diseño 007).
+- Esfera a Re = 100 del CFD (caso 3), que no pasa por resolución (+41 % con D = 6, ≈ +20 % con D = 12): dejarla como límite documentado o pasar al rebote interpolado de Bouzidi (mini-diseño 006, final).

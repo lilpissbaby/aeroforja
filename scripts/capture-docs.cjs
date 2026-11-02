@@ -618,6 +618,53 @@ async function tunnelScene(page) {
   await shot(page, "55-tunel-resultado", ".tunnel-side");
 }
 
+// ---------- CFD tunnel and gust test (mini-designs 006 and 007) ----------
+
+async function cfdScene(page) {
+  console.log("Túnel CFD (WebGPU; con SwiftShader tarda varios minutos)");
+  await fresh(page);
+  await WING_TEMPLATE(page);
+  await view(page, "Túnel CFD");
+  await page.locator("select").filter({ hasText: "Vista previa" }).selectOption("150000");
+  for (const [label, value] of [["α", "6"], ["Pasadas por la caja", "2"]]) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+    await page.getByLabel(label, { exact: true }).press("Enter");
+  }
+  await page.getByRole("button", { name: "Ensayar" }).click();
+  await page.waitForSelector(".cfd-viewer canvas");
+  let sliced = false;
+  for (let i = 0; i < 400; i++) {
+    await pause(5000);
+    const txt = await page.locator(".tunnel-side").innerText();
+    if (!sliced && /promediando/.test(txt)) {
+      sliced = true;
+      await page.locator(".cfd-tools select").nth(1).selectOption("1");
+    }
+    if (/Terminado|Detenido/.test(txt) || (await page.locator(".tunnel-side .verdict.bad").count()) > 0) break;
+  }
+  await pause(4000);
+  await shot(page, "60-tunel-cfd");
+  await shot(page, "61-tunel-cfd-resultado", ".tunnel-side");
+  await page.locator(".cfd-tools select").nth(2).selectOption("vorticity");
+  await page.getByLabel("Rejilla").check();
+  await pause(4000);
+  await shot(page, "62-tunel-cfd-vorticidad", ".cfd-viewer");
+}
+
+async function gustScene(page) {
+  console.log("Ráfaga");
+  await fresh(page);
+  await WING_TEMPLATE(page);
+  await view(page, "Ráfaga");
+  await page.getByRole("button", { name: "Con barrido de H" }).click();
+  await page.waitForSelector(".gust-viewer canvas", { timeout: 600000 });
+  await pause(2500);
+  await shot(page, "63-rafaga");
+  await page.locator(".gust-main").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await pause(800);
+  await shot(page, "64-rafaga-graficas", ".gust-main");
+}
+
 function boxStl(a, b, c) {
   const v = [[0, 0, 0], [a, 0, 0], [a, b, 0], [0, b, 0], [0, 0, c], [a, 0, c], [a, b, c], [0, b, c]];
   const faces = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [0, 4, 7, 3]];
@@ -694,12 +741,13 @@ async function claudeScene(page) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist"] });
+  // WebGPU for the CFD tunnel: the real GPU if there is one, SwiftShader (software) otherwise.
+  const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist", "--enable-unsafe-webgpu", "--enable-features=Vulkan"] });
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: "light", acceptDownloads: true });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.error("pageerror:", e.message));
   const only = process.env.SCENES?.split(",");
-  const scenes = { overview, tour, templates, drawing, editing, layersAndHoles, problems, massAndResults, exports, threeViews, tunnelScene, partsScene, claudeScene };
+  const scenes = { overview, tour, templates, drawing, editing, layersAndHoles, problems, massAndResults, exports, threeViews, tunnelScene, cfdScene, gustScene, partsScene, claudeScene };
   for (const [name, scene] of Object.entries(scenes)) {
     if (only === undefined || only.includes(name)) await scene(page);
   }
