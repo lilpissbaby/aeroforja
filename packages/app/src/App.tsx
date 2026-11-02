@@ -33,6 +33,8 @@ function useEffectiveTheme(): "light" | "dark" {
 export function App() {
   const theme = useEffectiveTheme();
   const panel = useAppStore((s) => s.panel);
+  // The CFD tunnel and the gust test need the room of the properties and results panels.
+  const bench = useAppStore((s) => s.view === "cfd" || s.view === "gust");
   useEffect(() => startPhysicsWorker(), []);
   useEffect(() => startClaudeBridge(), []);
   // First visit: the guided tour opens by itself once.
@@ -40,7 +42,7 @@ export function App() {
     if (!tourSeen()) useAppStore.getState().startTour();
   }, []);
   return (
-    <div className="app">
+    <div className={bench ? "app view-bench" : "app"}>
       <TopBar />
       <LeftPanel />
       <Workspace theme={theme} />

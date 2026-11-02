@@ -17,3 +17,4 @@ export * from "./atmosphere/index.ts";
 export * from "./mass/index.ts";
 export * from "./aero/index.ts";
 export { luFactor, luSolve, type LuFactors } from "./core/linalg.ts";
+export * from "./structures/beam.ts";

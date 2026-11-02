@@ -3,6 +3,8 @@
  * this boundary is plain data (structured clone), in SI units.
  */
 import type {
+  GustInput,
+  GustResponse,
   AtmosphereState,
   BluffComponent,
   FrictionComponent,
@@ -48,7 +50,17 @@ export interface TunnelRequest {
   readonly air: AirInput;
 }
 
-export type WorkerRequest = ComputeRequest | TunnelRequest;
+/** Gust test (mini-design 007): one gust, and optionally a sweep of gradient distances (m). */
+export interface GustRequest {
+  readonly kind: "gust";
+  readonly seq: number;
+  /** Air as in the top bar; the worker computes ρ, ν and a. */
+  readonly air: AirInput;
+  readonly input: Omit<GustInput, "air">;
+  readonly sweep: readonly number[] | null;
+}
+
+export type WorkerRequest = ComputeRequest | TunnelRequest | GustRequest;
 
 export type Outcome<T> =
   | { readonly ok: true; readonly result: Result<T> }
@@ -71,4 +83,19 @@ export interface TunnelResponse {
   readonly elapsed: number;
 }
 
-export type WorkerResponse = ComputeResponse | TunnelResponse;
+export interface GustSweepPoint {
+  readonly gradient: number;
+  readonly maxLoadFactor: number;
+  readonly maxRootMoment: number;
+}
+
+export interface GustResponseMessage {
+  readonly kind: "gust";
+  readonly seq: number;
+  readonly response: Outcome<GustResponse>;
+  readonly sweep: { readonly ok: true; readonly points: readonly GustSweepPoint[] } | { readonly ok: false; readonly message: string } | null;
+  /** ms */
+  readonly elapsed: number;
+}
+
+export type WorkerResponse = ComputeResponse | TunnelResponse | GustResponseMessage;

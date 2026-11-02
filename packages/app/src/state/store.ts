@@ -24,9 +24,9 @@ export type Panel = "planform" | "mass" | "parts";
 /**
  * Centre of the workbench: one 2D view (planta, alzado, perfil), the
  * planta beside the 3D model, the classic three views plus 3D, the 3D model
- * alone, or the wind tunnel.
+ * alone, the wind tunnel (VLM sweeps), the CFD tunnel or the gust test.
  */
-export type ViewMode = "plan" | "front" | "side" | "split" | "three" | "3d" | "tunnel";
+export type ViewMode = "plan" | "front" | "side" | "split" | "three" | "3d" | "tunnel" | "cfd" | "gust";
 
 export type Tool = "select" | "polygon" | "rect" | "circle";
 

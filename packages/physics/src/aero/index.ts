@@ -46,3 +46,22 @@ export {
   TREFFTZ_INDUCED_DRAG,
   VORTEX_LATTICE,
 } from "./methods.ts";
+export { buildUvlm, simulateLongitudinal, type AeroModel, type RigidLongitudinal, type UvlmHistory, type UvlmModel, type UvlmOptions } from "./uvlm.ts";
+export {
+  GUST_ASSUMPTIONS,
+  gustResponse,
+  gustSetup,
+  gustSweep,
+  mainWingReference,
+  oneMinusCosine,
+  prattWalkerKg,
+  type GivenValue,
+  type GustHistory,
+  type GustInput,
+  type GustPeak,
+  type GustReference,
+  type GustResponse,
+  type GustSetup,
+  type GustTrim,
+} from "./gust.ts";
+export { DISCRETE_GUST, PLATE_BENDING, PRATT_WALKER, RIGID_LONGITUDINAL, UNSTEADY_VORTEX_LATTICE } from "./methods.ts";

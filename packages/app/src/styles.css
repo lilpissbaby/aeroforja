@@ -124,6 +124,17 @@ select {
   height: 100%;
 }
 
+.app.view-bench {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "top top top"
+    "left view view";
+}
+.app.view-bench > .right,
+.app.view-bench > .bottom {
+  display: none;
+}
+
 .topbar {
   grid-area: top;
 }
@@ -1603,4 +1614,101 @@ kbd {
 }
 .claude-conflict p {
   margin: 0 0 8px;
+}
+
+/* ---------- CFD tunnel ---------- */
+
+.cfd-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+}
+.cfd-viewer {
+  flex: 1 1 auto;
+  min-height: 420px;
+}
+.cfd-tools select,
+.cfd-tools input[type="range"] {
+  font: inherit;
+}
+.cfd-tools .inline {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.cfd-legends {
+  position: absolute;
+  right: 10px;
+  bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+}
+.cfd-legend {
+  background: color-mix(in srgb, var(--viewport) 82%, transparent);
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: var(--ink);
+}
+.cfd-legend .ramp {
+  width: 160px;
+}
+.cfd-chart {
+  padding: 0 12px 12px;
+  max-width: 760px;
+}
+.cfd-compare {
+  margin-top: 8px;
+}
+.tunnel-side progress {
+  width: 100%;
+}
+.panel-note {
+  padding: 0 12px;
+}
+
+/* ---------- gust test ---------- */
+
+.gust-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gust-top {
+  position: relative;
+}
+.gust-viewer {
+  height: 380px;
+  border-radius: 4px;
+}
+.gust-exaggeration {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-size: var(--size-s);
+}
+.material-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: end;
+}
+
+@media (max-width: 900px) {
+  .app.view-bench {
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "top" "view" "left";
+  }
+  .tunnel.cfd,
+  .tunnel.gust {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.gust-viewer .cfd-legends {
+  top: 8px;
+  right: 10px;
+  bottom: auto;
 }

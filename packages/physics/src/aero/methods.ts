@@ -63,3 +63,46 @@ export const NEUTRAL_POINT: Method = {
     { citation: "Etkin, B., Reid, L. D. (1996). Dynamics of Flight: Stability and Control, 3rd ed., Wiley, sec. 2.3 (neutral point and static margin)." },
   ],
 };
+
+export const UNSTEADY_VORTEX_LATTICE: Method = {
+  id: "uvlm-linear-frozen-wake",
+  name: "Linearised unsteady vortex-lattice method: vortex rings on the steady lattice, flat wake frozen in body axes and convected at V∞, unsteady Kutta–Joukowski loads",
+  references: [
+    { citation: "Katz, J., Plotkin, A. (2001). Low-Speed Aerodynamics, 2nd ed., Cambridge University Press, §12.3 (vortex rings) and §13.12 (unsteady motion of a three-dimensional wing), eq. 13.150." },
+    { citation: "Murua, J., Palacios, R., Graham, J. M. R. (2012). Applications of the unsteady vortex-lattice method in aircraft aeroelasticity and flight dynamics. Progress in Aerospace Sciences 55, 46–72." },
+  ],
+};
+
+export const DISCRETE_GUST: Method = {
+  id: "discrete-gust-one-minus-cosine",
+  name: "Discrete vertical gust 1 − cos, w = (U_ds/2)(1 − cos(π s/H)) for 0 ≤ s ≤ 2H, met by each panel at its own x (penetration)",
+  references: [
+    { citation: "MIL-F-8785C (1980). Flying Qualities of Piloted Airplanes, discrete gust model; MIL-HDBK-1797 (1997)." },
+    { citation: "EASA CS-25.341(a) (gust shape U = (U_ds/2)[1 − cos(π s/H)])." },
+    { citation: "Wright, J. R., Cooper, J. E. (2015). Introduction to Aircraft Aeroelasticity and Loads, 2nd ed., Wiley, ch. 16 (gust and turbulence encounters)." },
+  ],
+};
+
+export const RIGID_LONGITUDINAL: Method = {
+  id: "rigid-heave-pitch",
+  name: "Rigid aircraft in vertical and pitch motion at constant forward speed, perturbation about trimmed 1 g flight, implicit trapezoidal integration of the joint aerodynamic and motion system",
+  references: [
+    { citation: "Wright, J. R., Cooper, J. E. (2015). Introduction to Aircraft Aeroelasticity and Loads, 2nd ed., Wiley, ch. 14 and 16." },
+    { citation: "Newmark, N. M. (1959). A method of computation for structural dynamics. Journal of the Engineering Mechanics Division 85(3), 67–94 (average acceleration)." },
+  ],
+};
+
+export const PRATT_WALKER: Method = {
+  id: "pratt-walker-gust-formula",
+  name: "Pratt–Walker gust load formula, Δn = ρ V a K_g U / (2 W/S), K_g = 0.88 μ_g / (5.3 + μ_g), μ_g = 2 (W/S) / (ρ c̄ a g)",
+  references: [{ citation: "Pratt, K. G., Walker, W. G. (1954). A revised gust-load formula and a re-evaluation of V-G data taken on civil transport airplanes from 1933 to 1950. NACA Report 1206." }],
+};
+
+export const PLATE_BENDING: Method = {
+  id: "cantilever-plate-bending",
+  name: "Half wing as an Euler–Bernoulli cantilever clamped at the plane of symmetry: bending moment with inertia relief, σ = 6M/(c t²) in a solid plate, deflection from w'' = M/(EI), first frequency by matrix iteration",
+  references: [
+    { citation: "Megson, T. H. G. (2017). Aircraft Structures for Engineering Students, 6th ed., Butterworth-Heinemann, ch. 16." },
+    { citation: "Timoshenko, S., Young, D. H., Weaver, W. (1974). Vibration Problems in Engineering, 4th ed., Wiley, §1.9 and §5.3." },
+  ],
+};

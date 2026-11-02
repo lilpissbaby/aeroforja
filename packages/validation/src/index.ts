@@ -3,3 +3,5 @@ export * from "./atmosphere/icao-doc-7488.ts";
 export * from "./atmosphere/humid-air-rp1485.ts";
 export * from "./mass/cases.ts";
 export * from "./aero/cases.ts";
+export * from "./cfd/cases.ts";
+export * from "./aero/gust-cases.ts";

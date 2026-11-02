@@ -4,6 +4,8 @@ import type { PlaneId } from "../planform/planes.ts";
 import { DrawToolbar } from "./editor/DrawToolbar.tsx";
 import { PlaneEditor } from "./editor/PlaneEditor.tsx";
 import { TunnelPanel } from "./tunnel/TunnelPanel.tsx";
+import { CfdPanel } from "./cfd/CfdPanel.tsx";
+import { GustPanel } from "./gust/GustPanel.tsx";
 import { Viewer3D } from "./Viewer3D.tsx";
 
 const VIEWS: readonly (readonly [ViewMode, string, string])[] = [
@@ -14,6 +16,8 @@ const VIEWS: readonly (readonly [ViewMode, string, string])[] = [
   ["split", "Planta + 3D", "Planta junto al modelo 3D"],
   ["3d", "3D", "Solo el modelo 3D"],
   ["tunnel", "Túnel de viento", "Barrido de ángulo de ataque: VLM + resistencia por componentes"],
+  ["cfd", "Túnel CFD", "Flujo alrededor del dron en 3D: Lattice Boltzmann en la tarjeta gráfica (WebGPU)"],
+  ["gust", "Ráfaga", "Ráfaga 1 − cos: factor de carga, sustentación extra y flexión del ala (ala fija)"],
 ];
 
 const SINGLE: Partial<Record<ViewMode, PlaneId>> = { plan: "top", side: "side", front: "front" };
@@ -35,7 +39,7 @@ export function Workspace({ theme }: { theme: "light" | "dark" }) {
     if (view === "split") useAppStore.getState().setEditor({ activePlane: "top" });
   }, [single, view]);
 
-  const drawing = view !== "3d" && view !== "tunnel";
+  const drawing = view !== "3d" && view !== "tunnel" && view !== "cfd" && view !== "gust";
   return (
     <main className={`workspace view-${view}`}>
       <div className="view-switch" role="tablist" aria-label="Vistas" data-tour="view-switch">
@@ -56,6 +60,14 @@ export function Workspace({ theme }: { theme: "light" | "dark" }) {
       ) : view === "tunnel" ? (
         <div className="workspace-panes">
           <TunnelPanel theme={theme} />
+        </div>
+      ) : view === "cfd" ? (
+        <div className="workspace-panes">
+          <CfdPanel />
+        </div>
+      ) : view === "gust" ? (
+        <div className="workspace-panes">
+          <GustPanel />
         </div>
       ) : (
         <div className="workspace-panes">

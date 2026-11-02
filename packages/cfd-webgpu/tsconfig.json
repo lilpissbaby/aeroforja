@@ -1,0 +1,10 @@
+{
+  // Pure TypeScript plus the WebGPU host, which runs in a Web Worker: ES2022
+  // and the WebWorker library (navigator.gpu), no DOM, no Node.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

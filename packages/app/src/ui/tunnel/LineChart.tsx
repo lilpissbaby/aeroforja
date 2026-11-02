@@ -30,6 +30,8 @@ export interface LineChartProps {
 }
 
 const W = 360;
+/** Above this many points the markers are left out. */
+const DENSE = 80;
 const H = 220;
 const M = { l: 46, r: 12, t: 12, b: 34 };
 
@@ -148,9 +150,10 @@ export function LineChart({ title, series, xLabel, yLabel, xFormat = fmt, yForma
               points={s.points.map((p) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ")}
             />
           ))}
-          {first.points.map((p, i) => (
-            <circle key={i} cx={X(p.x)} cy={Y(p.y)} r={hover === i ? 4.5 : 3} className={`pt ${p.level ?? "green"}`} />
-          ))}
+          {/* Dense time histories: only the hovered point gets a marker, or the halos would hide the line. */}
+          {first.points.map((p, i) =>
+            first.points.length <= DENSE || hover === i ? <circle key={i} cx={X(p.x)} cy={Y(p.y)} r={hover === i ? 4.5 : 3} className={`pt ${p.level ?? "green"}`} /> : null,
+          )}
         </g>
         {hovered !== null && (
           <g className="tip" transform={`translate(${Math.min(X(hovered.x) + 8, W - 128)}, ${M.t + 4})`}>

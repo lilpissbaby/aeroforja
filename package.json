@@ -14,6 +14,8 @@
     "preview": "pnpm --filter @aeroforja/app preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:slow": "vitest run --config vitest.slow.config.ts",
+    "test:gpu": "node packages/cfd-webgpu/scripts/gpu-check.cjs",
     "typecheck": "pnpm -r --no-bail typecheck",
     "check": "pnpm typecheck && pnpm test",
     "docs:capture": "node scripts/capture-docs.cjs",

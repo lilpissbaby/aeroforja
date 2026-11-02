@@ -19,7 +19,7 @@ export interface TourStep {
 
 const store = () => useAppStore.getState();
 
-const showPlanform = (view: "plan" | "split" | "3d" | "three" | "tunnel" = "split") => {
+const showPlanform = (view: "plan" | "split" | "3d" | "three" | "tunnel" | "cfd" | "gust" = "split") => {
   const s = store();
   if (s.panel !== "planform") s.setPanel("planform");
   if (s.view !== view) s.setView(view);
@@ -49,8 +49,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
       <>
         <p>
           En unos minutos verás todo lo que puedes hacer ahora mismo: dibujar tu dron en planta, alzado y perfil, ver su
-          modelo 3D al momento, montarle piezas STL, ensayarlo en el túnel de viento virtual, revisar cada resultado con su
-          método y su procedencia, y sacar archivos para el taller. También puedes diseñarlo hablando con Claude.
+          modelo 3D al momento, montarle piezas STL, ensayarlo en el túnel de viento virtual y en el túnel CFD, meterlo en una
+          ráfaga, revisar cada resultado con su método y su procedencia, y sacar archivos para el taller. También puedes diseñarlo hablando con Claude.
         </p>
         <p>
           Avanza con <Keys>→</Keys> o «Siguiente», vuelve con <Keys>←</Keys> y sal con <Keys>Esc</Keys>. El tour no cambia
@@ -395,6 +395,86 @@ export const TOUR_STEPS: readonly TourStep[] = [
       </>
     ),
     prepare: () => showPlanform("tunnel"),
+  },
+  {
+    id: "cfd",
+    target: "cfd-settings",
+    sides: ["right"],
+    title: "Túnel CFD",
+    body: (
+      <>
+        <p>
+          El flujo alrededor de <b>todo el cuerpo 3D</b> del dron: placas de las tres vistas, piezas STL y, si quieres, los
+          bloques de masa. Lattice Boltzmann D3Q19 con LES de Smagorinsky, calculado en tu tarjeta gráfica con WebGPU.
+        </p>
+        <p>
+          Eliges velocidad, α, β y resolución. Con 2 M celdas tarda de segundos a un par de minutos. Las fuerzas son
+          semicuantitativas, así que se quedan en ámbar como mucho. Sirven para comparar diseños entre sí, y al lado tienes
+          el VLM a ese mismo α.
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("cfd"),
+  },
+  {
+    id: "cfd-view",
+    target: "cfd-view",
+    sides: ["left", "bottom"],
+    title: "Presión, humo y cortes",
+    body: (
+      <>
+        <p>
+          La piel del dron se colorea por <b>Cp</b>, medio o instantáneo. El <b>humo</b> sale de un peine delante del
+          morro, con un color por altura, y al terminar se dibujan las <b>líneas de corriente</b> del flujo medio.
+        </p>
+        <p>
+          El <b>corte</b> muestra Cp, velocidad o vorticidad en un plano que mueves con el deslizador, y puede enseñar la
+          rejilla de cálculo. No hay corte de densidad: a la velocidad de un dron la densidad no cambia. En el panel,
+          «Validar en tu GPU» contrasta el solver con la esfera y el cilindro.
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("cfd"),
+  },
+  {
+    id: "gust",
+    target: "gust-settings",
+    sides: ["right"],
+    title: "Ensayo de ráfaga",
+    body: (
+      <>
+        <p>
+          Tu ala fija vuela recta a 1 g y entra en una <b>ráfaga vertical 1 − cos</b>. El VLM no estacionario y el movimiento
+          vertical y de cabeceo con tu masa, tu CG y tu inercia dan el <b>factor de carga</b>, la sustentación extra y el
+          ángulo de ataque frente al tiempo.
+        </p>
+        <p>
+          La semiala se calcula como viga: momento en la raíz y tensión en la placa. Con el módulo E de tu tablero, medido o
+          de ficha (aquí no se inventa), salen también la flecha y la primera frecuencia. Los multirrotores llegarán con la
+          propulsión y el 6DOF.
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("gust"),
+  },
+  {
+    id: "gust-results",
+    target: "gust-main",
+    sides: ["left", "bottom"],
+    title: "Carga, flexión y ráfaga crítica",
+    body: (
+      <>
+        <p>
+          El visor muestra el ala deformada en el instante del mayor momento, encima de la banda de la ráfaga coloreada por
+          su velocidad. Debajo van las gráficas frente al tiempo, con el máximo marcado, y la referencia de Pratt–Walker.
+        </p>
+        <p>
+          «Con barrido de H» repite la ráfaga con nueve longitudes y te dice cuál es la crítica. En rojo: pérdida (α &gt;
+          10°), CG inestable o una flecha que pasa del 10 % de la semienvergadura.
+        </p>
+      </>
+    ),
+    prepare: () => showPlanform("gust"),
   },
   {
     id: "claude",

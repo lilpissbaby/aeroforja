@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@aeroforja/physics": "workspace:*"
+    "@aeroforja/physics": "workspace:*",
+    "@aeroforja/cfd-webgpu": "workspace:*"
   }
 }

@@ -36,6 +36,16 @@ const METHODS: Readonly<Record<string, string>> = {
   "bluff-body-drag-coefficients": "Resistencia de cuerpos romos, (D/q) = Cd · A frontal (NASA Glenn)",
   "neutral-point-static-margin": "Punto neutro por dCm/dCL en la zona lineal y margen estático",
   "polyhedral-mass-properties": "Propiedades de masa de una malla cerrada por tetraedros con signo (Mirtich, Tonon)",
+  "lbm-d3q19-regularized-les": "Lattice Boltzmann D3Q19 con colisión BGK regularizada y LES de Smagorinsky, en FP32 con distribuciones desplazadas",
+  "lbm-boundaries": "Rebote a mitad de enlace en las paredes de vóxeles; entrada y campo lejano por equilibrio con la densidad de la celda interior; salida a ρ = 1 con gradiente de velocidad nulo",
+  "lbm-momentum-exchange": "Fuerzas y momentos por intercambio de momento en cada enlace de rebote, ΔF = −2 c_i f_ī",
+  "voxelization-ray-parity": "Voxelización por paridad de rayos en x, y y z (las piezas finas conservan su celda más cercana); mallas abiertas por solape triángulo–caja",
+  "uvlm-linear-frozen-wake": "VLM no estacionario linealizado: anillos de vórtice sobre la red estacionaria, estela plana congelada que se convecta a V∞, cargas por Kutta–Joukowski no estacionario",
+  "discrete-gust-one-minus-cosine": "Ráfaga vertical discreta 1 − cos, w = (U_ds/2)(1 − cos(π s/H)), que cada panel encuentra en su x (penetración)",
+  "rigid-heave-pitch": "Avión rígido en movimiento vertical y de cabeceo a velocidad constante, perturbación sobre vuelo a 1 g, integración implícita por la regla del trapecio",
+  "pratt-walker-gust-formula": "Fórmula de ráfaga de Pratt y Walker, Δn = ρ V a K_g U / (2 W/S), K_g = 0,88 μ_g / (5,3 + μ_g)",
+  "cantilever-plate-bending": "Semiala como viga de Euler–Bernoulli empotrada en el plano de simetría: momento con alivio inercial, σ = 6M/(c t²), flecha por w'' = M/(EI) y primera frecuencia por iteración matricial",
+  "massless-tracers": "Humo: trazadores sin masa movidos con la velocidad instantánea (RK2, trilineal); líneas de corriente por RK4 sobre la velocidad media",
 };
 
 const ASSUMPTIONS: Readonly<Record<string, string>> = {
@@ -66,12 +76,55 @@ const ASSUMPTIONS: Readonly<Record<string, string>> = {
   "beta-zero": "Derrape β = 0.",
   "uniform-density": "Densidad uniforme: vale para resina y piezas macizas; una pieza FDM con relleno hay que pesarla y su inercia es aproximada.",
   "mesh-is-the-part": "La malla es la pieza: su exactitud es la del archivo exportado.",
+  "lbm-weakly-compressible": "Casi incompresible: la red trabaja a Mach 0,087, con un error de compresibilidad del orden de Ma² ≈ 1 %.",
+  "lbm-les-no-wall-model":
+    "LES sin modelo de pared: la capa límite no se resuelve y la transición y las burbujas laminares no se modelan. La separación en cantos vivos (placas de DM) sí aparece, porque la fija la geometría.",
+  "lbm-staircase": "Geometría en escalera de vóxeles cúbicos: las placas alineadas con la rejilla son exactas en su plano y se engrosan a una celda si son más finas.",
+  "lbm-propellers-off": "Hélices paradas y no modeladas. En un multirrotor en vuelo el flujo lo dominan las estelas de los rotores.",
+  "lbm-free-stream": "Corriente libre sin turbulencia en una caja finita con caras de equilibrio (el bloqueo se informa).",
+  "lbm-rigid-fixed": "Cuerpo rígido y fijo.",
+  "gust-potential-flow": "Flujo potencial sin pérdida: por encima de 10° de ángulo de ataque la carga real la limita la pérdida, que no se modela.",
+  "gust-longitudinal": "Velocidad de avance constante y solo movimiento vertical y de cabeceo; sin mandos ni controladora.",
+  "gust-frozen-wake": "Estela plana y congelada en ejes cuerpo (pequeñas perturbaciones).",
+  "gust-rigid-flight":
+    "Avión rígido para la mecánica de vuelo; la flexión se calcula en un sentido (de cargas a deformación), sin aeroelasticidad ni dinámica estructural.",
+  "gust-solid-plate": "Placa maciza sin torsión: los vaciados hacen el ala menos rígida y la flecha en planta descarga la punta por acoplamiento flexión-torsión (no modelado).",
+  "gust-trim-loads": "La carga en envergadura a 1 g es la de la red al α de 1 g, como si se trimase sin cambiarla.",
+  "gust-quasi-steady": "Aerodinámica casi estacionaria: la sustentación sigue al ángulo de ataque al instante, sin retraso; sobrestima las ráfagas cortas.",
   "inertia-about-calculated-cg":
     "El CG es medido pero la inercia es calculada: la inercia sigue referida al CG calculado.",
 };
 
 const CHECKS: Readonly<Record<string, { label: string; note: string }>> = {
   mach: { label: "Mach", note: "Flujo incompresible: solo por debajo de Mach 0,3." },
+  gustAlpha: {
+    label: "α con la ráfaga",
+    note: "α de 1 g más el incremento de la ráfaga: verde hasta 5°, ámbar hasta 10°; por encima una placa plana entra en pérdida y la carga real la limita la pérdida (no modelada).",
+  },
+  staticMargin: { label: "Margen estático", note: "Con el CG detrás del punto neutro la respuesta diverge: el resultado no es físico." },
+  tipDeflectionRatio: {
+    label: "Flecha / semienvergadura",
+    note: "Viga lineal: verde hasta 5 %, ámbar hasta 10 %; por encima la deformación cambiaría las cargas (aeroelasticidad, no modelada).",
+  },
+  gustToBendingPeriod: {
+    label: "Duración de la ráfaga / periodo de flexión",
+    note: "Si la ráfaga dura menos de 3 periodos de la primera flexión, el ala vibra y la flecha dinámica puede ser mayor (no modelada).",
+  },
+  youngModulus: { label: "Módulo E", note: "Verde si es medido; ámbar si es de ficha." },
+  flexuralStrength: { label: "Resistencia a flexión", note: "Verde si es medida; ámbar si es de ficha." },
+  arealMass: { label: "Masa por área", note: "Verde si es medida; ámbar si es de ficha." },
+  cfdForces: {
+    label: "Fuerzas del CFD",
+    note: "Semicuantitativas en esta entrega: ámbar como máximo (mini-diseño 006, decisión 2). Sirven para comparar diseños entre sí.",
+  },
+  cellsPerFeature: {
+    label: "Resolución",
+    note: "Celdas a lo ancho de la cuerda media o de la pieza STL más pequeña: por debajo de 8 la forma no está resuelta (rojo).",
+  },
+  blockage: {
+    label: "Bloqueo",
+    note: "Área frontal sobre la sección de la caja: hasta 2 % sin efecto apreciable, de 2 a 5 % ámbar, por encima de 5 % las paredes de la caja cambian el flujo.",
+  },
   alphaRangeOfSummary: {
     label: "α del resumen",
     note: "La pendiente, el punto neutro y el factor de Oswald se ajustan solo con |α| ≤ 5° (placa plana a bajo Reynolds).",

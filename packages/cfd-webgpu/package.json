@@ -1,0 +1,18 @@
+{
+  "name": "@aeroforja/cfd-webgpu",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Virtual CFD tunnel (mini-design 006): lattice Boltzmann D3Q19 with regularized BGK and Smagorinsky LES. WGSL kernels for WebGPU plus a TypeScript reference solver that the validation cases and the GPU kernels are checked against. No UI.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@aeroforja/physics": "workspace:*"
+  }
+}
