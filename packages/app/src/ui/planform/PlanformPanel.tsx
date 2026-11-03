@@ -15,7 +15,8 @@ import {
 import { PLANE_SPECS, PLANES } from "../../planform/planes.ts";
 import { mm1 } from "../../planform/view.ts";
 import { useAppStore } from "../../state/store.ts";
-import { fromDegrees, fromMillimeters, toDegrees, toMillimeters } from "../../units/display.ts";
+import { formatFixed, fromDegrees, fromMillimeters, toDegrees, toMillimeters } from "../../units/display.ts";
+import { Fold } from "../Fold.tsx";
 import { NumberField } from "../NumberField.tsx";
 import { usePlanformAnalysis } from "./usePlanformAnalysis.ts";
 
@@ -120,9 +121,9 @@ function FrameTemplate() {
     />
   );
 
+  const summary = `${arms} brazos ${layout === "x" ? "X" : "+"} · ${formatFixed(mm.motorCircle, 0)} mm · ${formatFixed(propInches, 1)}″`;
   return (
-    <details className="template" open>
-      <summary>Frame de multirrotor</summary>
+    <Fold id="template-frame" className="template" title="Frame de multirrotor" summary={summary} forceOpen={problems.length > 0}>
       <div className="grid-2">
         <div className="field">
           <label htmlFor="frame-arms">Brazos</label>
@@ -175,7 +176,7 @@ function FrameTemplate() {
         «Altura hélice», del plano de giro sobre la placa. Solo geometría de partida: luego puedes mover cada vértice. Ctrl+Z
         deshace.
       </p>
-    </details>
+    </Fold>
   );
 }
 
@@ -230,9 +231,9 @@ function WingTemplate() {
     />
   );
 
+  const summary = `b ${formatFixed(v.span, 0)} mm · Λ ${formatFixed(v.sweep, 1)}°`;
   return (
-    <details className="template">
-      <summary>Ala por parámetros</summary>
+    <Fold id="template-wing" className="template" title="Ala por parámetros" summary={summary} forceOpen={problems.length > 0}>
       <div className="field">
         <label htmlFor="wing-preset">Punto de partida</label>
         <select
@@ -277,12 +278,13 @@ function WingTemplate() {
         Media ala derecha con simetría: el reflejo se crea solo. Placa plana del espesor indicado. Las derivas de punta se
         dibujan en el perfil (0 para ninguna).
       </p>
-    </details>
+    </Fold>
   );
 }
 
 export function PlanformPanel() {
   const elements = useAppStore((s) => s.planform.elements);
+  const touring = useAppStore((s) => s.tourStep !== null);
   const analysis = usePlanformAnalysis();
   const perPlane = PLANES.map((p) => `${elements.filter((e) => e.plane === p).length} ${PLANE_SPECS[p].label.toLowerCase()}`).join(" · ");
   return (
@@ -296,9 +298,10 @@ export function PlanformPanel() {
       </section>
       <ElementList />
       <section className="panel-section" data-tour="templates">
-        <h3>Plantillas</h3>
-        <FrameTemplate />
-        <WingTemplate />
+        <Fold id="templates" className="templates-group" title="Plantillas" summary="multirrotor · ala" forceOpen={touring}>
+          <FrameTemplate />
+          <WingTemplate />
+        </Fold>
       </section>
     </>
   );

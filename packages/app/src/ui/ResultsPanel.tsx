@@ -17,6 +17,8 @@ import { mm1 } from "../planform/view.ts";
 import { ExportButtons } from "./planform/ExportButtons.tsx";
 import { usePlanformAnalysis } from "./planform/usePlanformAnalysis.ts";
 import { IssueBadge, MethodDetails, ProvenanceTag, ResultHead, ValidityBadge } from "./ResultMeta.tsx";
+import { useDockFolded } from "./Dock.tsx";
+import { useLayout } from "../state/layout.ts";
 
 type Tab = "plan" | "mass" | "inertia" | "air" | "warnings";
 
@@ -317,25 +319,49 @@ function WarningsTab({ warnings, planIssues }: { warnings: Warning[]; planIssues
   );
 }
 
+/** Worst level among the warnings, so a folded results panel still shows red. */
+function worstLevel(warnings: readonly Warning[], planIssues: readonly PlanformIssue[]): "red" | "amber" | null {
+  const red = planIssues.some((i) => i.level === "red") || warnings.some((w) => w.check === undefined || w.check.level === "red");
+  if (red) return "red";
+  return warnings.length + planIssues.length > 0 ? "amber" : null;
+}
+
 export function ResultsPanel() {
   const [tab, setTab] = useState<Tab>("plan");
   const results = useAppStore((s) => s.results);
   const planIssues = usePlanformAnalysis().issues;
+  const folded = useDockFolded("bottom");
   const warnings = collectWarnings(results);
   const count = warnings.length + planIssues.length;
+  const worst = worstLevel(warnings, planIssues);
   const tabs: readonly [Tab, string][] = [
     ["plan", "Dibujo"],
     ["mass", "Masa y CG"],
     ["inertia", "Inercia"],
     ["air", "Aire"],
-    ["warnings", count === 0 ? "Avisos" : `Avisos (${count})`],
+    ["warnings", "Avisos"],
   ];
   return (
     <section className="bottom" aria-label="Resultados" data-tour="results">
       <div className="tabs" role="tablist">
         {tabs.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={!folded && tab === id}
+            onClick={() => {
+              setTab(id);
+              // A folded panel keeps its tabs: choosing one opens it.
+              if (folded) useLayout.getState().setCollapsed("bottom", false);
+            }}
+          >
             {label}
+            {id === "warnings" && worst !== null && (
+              <span className={`tab-count ${worst}`} title={worst === "red" ? "Hay errores o resultados fuera de rango" : "Hay avisos"}>
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>

@@ -156,6 +156,16 @@ const view = (page, name) => page.locator(".view-switch").getByRole("tab", { nam
 const resultsTab = (page, name) => page.locator(".bottom .tabs").getByRole("tab", { name, exact: false }).first().click();
 const workspace = ".workspace";
 
+/** The templates are folded by default: opens the group and the named template, and returns it. */
+async function openTemplate(page, name) {
+  const group = page.locator("details.templates-group");
+  if (!(await group.evaluate((d) => d.open))) await group.locator(":scope > summary").click();
+  const template = page.locator("details.template", { hasText: name });
+  if (!(await template.evaluate((d) => d.open))) await template.locator(":scope > summary").click();
+  await pause(200);
+  return template;
+}
+
 function rect(cx, cy, w, h) {
   return [
     { x: cx + h / 2, y: cy - w / 2 },
@@ -231,7 +241,7 @@ async function tour(page) {
 async function templates(page) {
   console.log("Plantillas");
   await fresh(page);
-  const frame = page.locator("details.template", { hasText: "Frame de multirrotor" });
+  const frame = await openTemplate(page, "Frame de multirrotor");
   await frame.locator("#frame-arms").selectOption("6");
   await shot(page, "07-plantilla-frame", 'details.template[open]', 12);
   const field = (label) => frame.getByLabel(label, { exact: true });
@@ -243,10 +253,8 @@ async function templates(page) {
   await pause(1500);
   await shot(page, "08-hexa", workspace);
 
-  const wing = page.locator("details.template", { hasText: "Ala por parámetros" });
-  await wing.locator("summary").click();
-  await pause(200);
-  await frame.locator("summary").click();
+  const wing = await openTemplate(page, "Ala por parámetros");
+  await frame.locator(":scope > summary").click();
   await pause(200);
   await shot(page, "09-plantilla-ala", 'details.template[open]', 12);
   await wing.getByRole("button", { name: "Sustituir planta" }).click();
@@ -416,7 +424,7 @@ async function layersAndHoles(page) {
 async function problems(page) {
   console.log("Errores y avisos");
   await fresh(page);
-  const frame = page.locator("details.template", { hasText: "Frame de multirrotor" });
+  const frame = await openTemplate(page, "Frame de multirrotor");
   await frame.getByLabel("Ø hélice", { exact: true }).fill("9");
   await frame.getByLabel("Ø hélice", { exact: true }).press("Enter");
   await frame.getByRole("button", { name: "Sustituir planta" }).click();
@@ -568,8 +576,7 @@ async function animation(browser) {
 
 const WING_TEMPLATE = async (page) => {
   await page.locator(".left .tabs").getByRole("tab", { name: "Dibujo" }).click();
-  const wing = page.locator("details.template", { hasText: "Ala por parámetros" });
-  if (!(await wing.evaluate((d) => d.open))) await wing.locator("summary").click();
+  const wing = await openTemplate(page, "Ala por parámetros");
   await wing.getByRole("button", { name: "Sustituir planta" }).click();
   await pause(1200);
 };

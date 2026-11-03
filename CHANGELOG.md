@@ -2,6 +2,13 @@
 
 Formato: una entrada por entrega, lo más nuevo arriba. Cada cambio que afecta a resultados físicos enlaza su mini-diseño.
 
+## 0.7.4 · 03-11-2026
+
+- **Más sitio para el plano**: el panel izquierdo, el de propiedades y el de resultados se pliegan con un botón en su esquina y cambian de tamaño arrastrando su borde (doble clic: tamaño inicial; también con teclado). «Ampliar vista» en la barra superior, o la tecla <kbd>A</kbd>, los pliega todos y los devuelve. Plegados, los laterales quedan como una tira con su nombre (la de propiedades dice qué hay seleccionado) y los resultados conservan sus pestañas con el número de avisos en rojo o ámbar, así que plegar nunca esconde un resultado fuera de rango. La disposición se recuerda en el navegador (`aeroforja.layout.v1`), no va en el proyecto, y el tour enseña siempre todos los paneles abiertos.
+- **Plantillas plegables**: «Plantillas» y cada plantilla se pliegan, empiezan plegadas y resumen en su línea lo que tienen puesto; lo escrito se conserva al plegar y una plantilla con error se queda abierta. «Proyecto» también se pliega.
+- La barra de estado del plano ocupa una línea (la ayuda entera, al pasar el ratón) y las pestañas de vista ya no se parten en dos líneas cuando el panel izquierdo es ancho.
+- Sin cambios en la física.
+
 ## 0.7.3 · 03-11-2026
 
 - Corrección: con dos servidores AeroForja a la vez (cada ventana de Claude o sesión enlazada arranca el suyo), el segundo no podía abrir el puerto 47615 y trabajaba a ciegas: la app mostraba el diseño del otro y `app_status` decía «abre la app y se conecta sola». Ahora el servidor que Claude está usando toma el puente antes de cada herramienta (`POST /handover` al otro servidor AeroForja) y la app, avisada con un evento `handover`, se reconecta a él en menos de un segundo. Un servidor AeroForja antiguo o cualquier otro programa en el puerto se informa en `app_status` (`bridgeState`, con qué hacer) y no se pelea por él. `/handover` rechaza peticiones con cabecera `Origin`, así que una página web no puede quitar el puente. Sin cambios en la física.

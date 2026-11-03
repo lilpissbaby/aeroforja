@@ -115,8 +115,9 @@ select {
 
 .app {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 330px;
-  grid-template-rows: auto minmax(0, 1fr) 270px;
+  /* Track sizes come from the panels' layout (state/layout.ts, App.tsx). */
+  grid-template-columns: var(--dock-left, 250px) minmax(0, 1fr) var(--dock-right, 330px);
+  grid-template-rows: auto minmax(0, 1fr) var(--dock-bottom, 270px);
   grid-template-areas:
     "top top top"
     "left view right"
@@ -130,24 +131,24 @@ select {
     "top top top"
     "left view view";
 }
-.app.view-bench > .right,
-.app.view-bench > .bottom {
+.app.view-bench > .dock-right,
+.app.view-bench > .dock-bottom {
   display: none;
 }
 
 .topbar {
   grid-area: top;
 }
-.left {
+.dock-left {
   grid-area: left;
 }
 .workspace {
   grid-area: view;
 }
-.right {
+.dock-right {
   grid-area: right;
 }
-.bottom {
+.dock-bottom {
   grid-area: bottom;
 }
 
@@ -157,14 +158,184 @@ select {
   background: var(--panel);
   overflow: auto;
 }
-.left {
+
+/* ---------- docks: foldable, resizable panels ---------- */
+
+.dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel);
+}
+.dock-left {
   border-right: 1px solid var(--rule);
 }
-.right {
+.dock-right {
   border-left: 1px solid var(--rule);
 }
-.bottom {
+.dock-bottom {
   border-top: 1px solid var(--rule);
+}
+.dock-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-body > * {
+  flex: 1;
+  min-height: 0;
+}
+.dock-left.folded > .dock-body,
+.dock-right.folded > .dock-body {
+  display: none;
+}
+.dock-bottom.folded .tab-body {
+  display: none;
+}
+.dock-bottom.folded .bottom {
+  overflow: hidden;
+}
+.dock-bottom.folded .tabs {
+  border-bottom: 0;
+}
+
+/* Room for the fold button at the top corner of each panel. */
+.dock-left .left > .tabs,
+.dock-bottom .bottom > .tabs {
+  padding-right: 44px;
+}
+.dock-right .right > :first-child > :first-child {
+  padding-right: 36px;
+}
+
+.dock-fold {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.dock-fold:hover {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+.dock-bottom .dock-fold {
+  top: 6px;
+  right: 12px;
+}
+
+.dock-rail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 11px 0;
+  border: 0;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--size-s);
+  cursor: pointer;
+}
+.dock-rail:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+.dock-rail-label {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 0;
+  letter-spacing: 0.02em;
+}
+.dock-rail-label b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.dock-resize {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+.dock-resize-left,
+.dock-resize-right {
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+}
+.dock-resize-left {
+  right: -5px;
+}
+.dock-resize-right {
+  left: -5px;
+}
+.dock-resize-bottom {
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 9px;
+  cursor: row-resize;
+}
+.dock-resize::after {
+  content: "";
+  position: absolute;
+  background: var(--mdf);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.dock-resize-left::after,
+.dock-resize-right::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+}
+.dock-resize-bottom::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 3px;
+}
+.dock-resize:hover::after,
+.dock-resize:focus-visible::after,
+body.resizing-x .dock-resize::after,
+body.resizing-y .dock-resize::after {
+  opacity: 1;
+}
+.dock-resize:focus-visible {
+  outline: none;
+}
+body.resizing-x,
+body.resizing-y {
+  user-select: none;
+}
+body.resizing-x * {
+  cursor: col-resize !important;
+}
+body.resizing-y * {
+  cursor: row-resize !important;
+}
+
+.chevron {
+  display: block;
+  transition: transform 0.12s;
 }
 
 @media (max-width: 900px) {
@@ -174,10 +345,20 @@ select {
     grid-template-areas: "top" "view" "left" "right" "bottom";
     height: auto;
   }
-  .left,
-  .right {
+  .dock-left,
+  .dock-right {
     border: 0;
     border-top: 1px solid var(--rule);
+  }
+  .dock-resize {
+    display: none;
+  }
+  .dock-rail {
+    flex-direction: row;
+    padding: 10px 16px;
+  }
+  .dock-rail-label {
+    writing-mode: horizontal-tb;
   }
 }
 
@@ -250,6 +431,50 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+.focus-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.focus-button svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.focus-button kbd {
+  margin-left: 1px;
+}
+.focus-button[aria-pressed="true"] {
+  border-color: var(--mdf);
+  color: var(--mdf);
+  font-weight: 600;
+}
+
+/* Count of warnings on the results tab, coloured by the worst one. */
+.tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  color: var(--panel);
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.tab-count.red {
+  background: var(--bad);
+}
+.tab-count.amber {
+  background: var(--warn);
 }
 .tour-glyph {
   display: inline-grid;
@@ -411,14 +636,66 @@ select {
   font-weight: 600;
 }
 
+/* Foldable sections (ui/Fold.tsx): a title line with a summary of what is inside. */
+details.fold > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 2px 0;
+  cursor: pointer;
+  list-style: none;
+}
+details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+details.fold > summary:hover .fold-title {
+  color: var(--mdf);
+}
+.fold-chevron {
+  flex: none;
+  align-self: center;
+  color: var(--muted);
+  transition: transform 0.12s;
+}
+details.fold[open] > summary .fold-chevron {
+  transform: rotate(90deg);
+}
+.fold-title {
+  flex: none;
+  font-weight: 600;
+}
+.fold-summary {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: var(--font-num);
+  font-size: var(--size-s);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+details.fold[open] > summary .fold-summary {
+  visibility: hidden;
+}
+details.fold > .fold-body {
+  padding-top: 8px;
+}
+
+.templates-group > .fold-body {
+  padding-top: 4px;
+}
 details.template {
   border-top: 1px solid var(--rule);
-  padding: 8px 0;
+  margin-top: 6px;
+  padding: 6px 0 2px 12px;
 }
-details.template summary {
-  cursor: pointer;
+details.template > summary .fold-title {
+  font-weight: 500;
+}
+details.template[open] > summary .fold-title {
   font-weight: 600;
-  margin-bottom: 8px;
 }
 details.template .field {
   margin-bottom: 6px;
@@ -704,6 +981,13 @@ details.method .ref {
   padding: 6px 12px 0;
   border-bottom: 1px solid var(--rule);
   background: var(--panel);
+  /* One row whatever the panels leave: scrolls sideways instead of growing. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.view-switch button {
+  flex: none;
+  white-space: nowrap;
 }
 .view-switch button,
 .left > .tabs button {
@@ -1011,7 +1295,6 @@ details.method .ref {
   background: var(--panel);
   font-size: var(--size-s);
   color: var(--muted);
-  min-height: 48px;
 }
 .plan-status .num {
   color: var(--ink);
@@ -1020,8 +1303,13 @@ details.method .ref {
 .plan-status .snap {
   color: var(--mdf);
 }
+/* One line, so the drawing keeps its height; the whole hint is in the tooltip. */
 .plan-status .hint-text {
-  flex-basis: 100%;
+  flex: 1 1 0;
+  min-width: 12ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plan-empty {

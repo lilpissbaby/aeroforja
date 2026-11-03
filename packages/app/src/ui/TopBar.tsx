@@ -1,6 +1,7 @@
 import { useAppStore, type ThemeChoice } from "../state/store.ts";
 import { NumberField } from "./NumberField.tsx";
 import { resolveConflict, useClaudeLink } from "../bridge/claude.ts";
+import { useLayout, visibleDocks } from "../state/layout.ts";
 
 /** Shown only when Claude Desktop's AeroForja server is running on this computer. */
 function ClaudeChip() {
@@ -27,6 +28,34 @@ function ClaudeChip() {
         </div>
       )}
     </>
+  );
+}
+
+/** Folds every panel on screen so the view takes the whole window, and gives them back. */
+function FocusButton() {
+  const bench = useAppStore((s) => s.view === "cfd" || s.view === "gust");
+  const visible = visibleDocks(bench);
+  const allFolded = useLayout((s) => visible.every((id) => s.collapsed[id]));
+  const touring = useAppStore((s) => s.tourStep !== null);
+  const label = allFolded && !touring ? "Mostrar paneles" : "Ampliar vista";
+  return (
+    <button
+      type="button"
+      className="button focus-button"
+      aria-pressed={allFolded && !touring}
+      title={allFolded ? "Vuelve a abrir los paneles que tenías (A)" : "Pliega los paneles para ver el plano entero (A)"}
+      onClick={() => useLayout.getState().toggleFocus(visible)}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        {allFolded && !touring ? (
+          <path d="M5 1.5V5H1.5M9 1.5V5h3.5M5 12.5V9H1.5M9 12.5V9h3.5" />
+        ) : (
+          <path d="M1.5 5V1.5H5M12.5 5V1.5H9M1.5 9v3.5H5M12.5 9v3.5H9" />
+        )}
+      </svg>
+      {label}
+      <kbd>A</kbd>
+    </button>
   );
 }
 
@@ -86,6 +115,7 @@ export function TopBar() {
 
       <div className="topbar-end" data-tour="topbar-end">
         <ClaudeChip />
+        <FocusButton />
         <button type="button" className="button tour-button" onClick={startTour}>
           <span className="tour-glyph" aria-hidden="true">
             ?

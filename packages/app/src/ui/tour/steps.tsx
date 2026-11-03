@@ -94,12 +94,20 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "topbar-end",
     target: "topbar-end",
     sides: ["bottom", "left"],
-    title: "Tour y tema",
+    title: "Paneles, tour y tema",
     body: (
-      <p>
-        «Tour guiado» vuelve a abrir esta guía cuando quieras. A su lado eliges tema claro, oscuro o el de tu sistema; el
-        plano y el 3D cambian de colores con él.
-      </p>
+      <>
+        <p>
+          «Ampliar vista» (tecla <Keys>A</Keys>) pliega los paneles de los lados y el de resultados para que el plano ocupe la
+          pantalla; pulsado otra vez, te los devuelve como estaban. Cada panel también se pliega con su botón de la esquina y
+          cambia de tamaño arrastrando su borde (doble clic en el borde: tamaño inicial). Plegados, los resultados siguen
+          enseñando sus pestañas y el número de avisos en rojo o ámbar.
+        </p>
+        <p>
+          «Tour guiado» vuelve a abrir esta guía cuando quieras; mientras dura, todos los paneles se ven abiertos. A su lado
+          eliges tema claro, oscuro o el de tu sistema; el plano y el 3D cambian de colores con él.
+        </p>
+      </>
     ),
   },
   {
@@ -150,6 +158,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
           puntos de partida de ala volante, delta y ala recta.
         </p>
         <p>«Sustituir planta» empieza de cero; «Añadir» lo suma a lo que tengas. Las dos cosas se deshacen con Ctrl+Z.</p>
+        <p>
+          Las plantillas están plegadas para no quitarle sitio a la lista: un clic en el título las abre, y plegadas resumen en
+          su línea los valores que tienen puestos.
+        </p>
       </>
     ),
   },
@@ -263,8 +275,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     title: "Barra de estado",
     body: (
       <p>
-        Coordenadas del cursor en mm, qué ajuste se está aplicando y la ayuda de la herramienta activa. Útil para colocar un
-        vértice en una medida exacta sin escribirla.
+        Coordenadas del cursor en mm, qué ajuste se está aplicando y la ayuda de la herramienta activa, en una sola línea
+        para no quitarle alto al plano (deja el ratón encima para leerla entera). Útil para colocar un vértice en una medida
+        exacta sin escribirla.
       </p>
     ),
   },

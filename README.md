@@ -88,7 +88,7 @@ El tour se abre solo la primera vez que entras y, después, con el botón **Tour
 | <kbd>←</kbd> o «Anterior» | paso anterior |
 | <kbd>Esc</kbd> o «Salir del tour» | cerrar |
 
-Recorre, en orden: proyecto, aire, tour y tema, pestañas Planta/Masas, lista de elementos, plantillas, vistas, herramientas, plano cartesiano, cómo dibujar, cómo editar, barra de estado, propiedades, visor 3D y sus opciones, resultados, archivos para el taller, piezas STL, túnel de viento, túnel CFD (ensayo y visor de presión, humo y cortes), ensayo de ráfaga (ajustes y resultados), Claude Desktop, modelo de masas, propiedades de una pieza, guardar y abrir, y un resumen de atajos.
+Recorre, en orden: proyecto, aire, paneles, tour y tema, pestañas Planta/Masas, lista de elementos, plantillas, vistas, herramientas, plano cartesiano, cómo dibujar, cómo editar, barra de estado, propiedades, visor 3D y sus opciones, resultados, archivos para el taller, piezas STL, túnel de viento, túnel CFD (ensayo y visor de presión, humo y cortes), ensayo de ráfaga (ajustes y resultados), Claude Desktop, modelo de masas, propiedades de una pieza, guardar y abrir, y un resumen de atajos.
 
 ---
 
@@ -108,6 +108,17 @@ Recorre, en orden: proyecto, aire, tour y tema, pestañas Planta/Masas, lista de
 
 Todo se guarda solo en el navegador mientras trabajas.
 
+### Más sitio para el plano
+
+Los paneles 2, 6 y 7 se pliegan y cambian de tamaño, para que el plano no se quede en una franja:
+
+- **Ampliar vista** (barra superior, tecla <kbd>A</kbd>) pliega a la vez el panel izquierdo, las propiedades y los resultados; pulsado otra vez, te devuelve los que tenías abiertos.
+- Cada panel tiene su **botón de plegar** en la esquina. Plegados, los laterales quedan como una tira estrecha con su nombre (la de propiedades dice qué tienes seleccionado) y un clic los abre. Los resultados plegados siguen enseñando sus pestañas, y «Avisos» lleva el número de avisos en **rojo** o **ámbar**: plegar el panel nunca esconde un resultado fuera de rango.
+- **Arrastra el borde** de un panel para cambiar su ancho o su alto; doble clic en el borde lo devuelve al tamaño inicial. Con el teclado: <kbd>Tab</kbd> hasta el borde y flechas (<kbd>Mayús</kbd>: pasos más grandes), <kbd>Intro</kbd> para el tamaño inicial.
+- Las **plantillas** y la sección **Proyecto** se pliegan con su título; plegadas, su línea resume lo que tienen puesto.
+
+Esta disposición es tuya: se recuerda en este navegador y no va en el JSON del proyecto ni cambia ningún resultado. Mientras dura el tour guiado se ven todos los paneles abiertos.
+
 ---
 
 ## 1. Barra superior
@@ -121,6 +132,7 @@ Todo se guarda solo en el navegador mientras trabajas.
   - *Humedad* relativa en %. Vacía significa aire seco.
 
   Los resultados salen en la pestaña [Aire](#7-resultados).
+- **Ampliar vista** (<kbd>A</kbd>): pliega los paneles para que el plano ocupe la pantalla, y los devuelve (ver [Más sitio para el plano](#más-sitio-para-el-plano)).
 - **Tour guiado**: vuelve a abrir el tour.
 - **Tema**: claro, oscuro o el de tu sistema. El plano y el 3D cambian de colores con él.
 
@@ -148,6 +160,8 @@ Arriba ves el total de elementos y en cuántas **capas** se reparten: cada capa 
 ### Plantillas paramétricas
 
 Las plantillas generan un punto de partida editable a partir de unas pocas medidas. «**Sustituir planta**» borra lo que hay y pone la plantilla; «**Añadir**» la suma al dibujo. Las dos acciones se deshacen con <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+
+Están plegadas para no quitarle sitio a la lista de elementos: un clic en «Plantillas» y luego en la que quieras. Plegada, cada una resume en su línea los valores que tiene puestos (por ejemplo «4 brazos X · 220 mm · 5,0″»), y los valores que hayas escrito se conservan aunque la pliegues. Si una plantilla tiene un error en sus medidas, se queda abierta para que lo veas.
 
 #### Frame de multirrotor
 
@@ -666,6 +680,7 @@ Lo que no está validado lo dice la app en ámbar o rojo, no en una nota al pie.
 | <kbd>Supr</kbd> / <kbd>Retroceso</kbd> | Borrar el elemento o el vértice elegido; al dibujar, quitar el último vértice |
 | Flechas | Mover el elemento seleccionado un paso de rejilla (<kbd>Mayús</kbd>: ×10) |
 | <kbd>F</kbd> | Encuadrar el plano |
+| <kbd>A</kbd> | Ampliar vista: plegar los paneles o devolverlos (en cualquier vista y pestaña) |
 | <kbd>Intro</kbd> | Cerrar el contorno |
 | <kbd>Esc</kbd> | Cancelar el dibujo, deseleccionar, volver a Seleccionar o cerrar el tour |
 | <kbd>Mayús</kbd> al dibujar | Ángulos de 15° |

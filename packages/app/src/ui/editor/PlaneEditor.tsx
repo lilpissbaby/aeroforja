@@ -1013,7 +1013,11 @@ export function PlaneEditor({ plane, exclusive, compact = false }: PlaneEditorPr
         </span>
         {cursor !== null && SNAP_NAMES[cursor.kind] !== "" && <span className="snap">{SNAP_NAMES[cursor.kind]}</span>}
         {notice !== null && <span className="notice">{notice}</span>}
-        {!compact && <span className="hint-text">{HINTS[tool]}</span>}
+        {!compact && (
+          <span className="hint-text" title={HINTS[tool]}>
+            {HINTS[tool]}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { ComponentList } from "./ComponentList.tsx";
 import { PartsPanel } from "./parts/PartsPanel.tsx";
 import { PlanformPanel } from "./planform/PlanformPanel.tsx";
 import { download, fileSafe } from "./download.ts";
+import { Fold } from "./Fold.tsx";
 
 const TABS: readonly (readonly [Panel, string])[] = [
   ["planform", "Dibujo"],
@@ -21,6 +22,7 @@ function ProjectFiles() {
   const fileError = useAppStore((s) => s.fileError);
   const loadProject = useAppStore((s) => s.loadProject);
   const setFileError = useAppStore((s) => s.setFileError);
+  const touring = useAppStore((s) => s.tourStep !== null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const importFile = async (file: File): Promise<void> => {
@@ -35,45 +37,52 @@ function ProjectFiles() {
 
   return (
     <section className="panel-section" data-tour="project-files">
-      <h3>Proyecto</h3>
-      <div className="row">
-        <button type="button" className="button" onClick={() => fileInput.current?.click()}>
-          Abrir JSON
-        </button>
-        <button
-          type="button"
-          className="button"
-          onClick={() =>
-            download(
-              `${fileSafe(projectName)}.aeroforja.json`,
-              JSON.stringify(toProjectFile(projectName, model, planform, parts, allMeshes()), null, 2),
-              "application/json",
-            )
-          }
-        >
-          Guardar JSON
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file !== undefined) void importFile(file);
-            e.target.value = "";
-          }}
-        />
-      </div>
-      {fileError !== null && (
-        <p className="error-box" role="alert">
-          {fileError}
+      <Fold
+        id="project"
+        title="Proyecto"
+        summary="abrir y guardar JSON"
+        defaultOpen
+        forceOpen={touring || fileError !== null}
+      >
+        <div className="row">
+          <button type="button" className="button" onClick={() => fileInput.current?.click()}>
+            Abrir JSON
+          </button>
+          <button
+            type="button"
+            className="button"
+            onClick={() =>
+              download(
+                `${fileSafe(projectName)}.aeroforja.json`,
+                JSON.stringify(toProjectFile(projectName, model, planform, parts, allMeshes()), null, 2),
+                "application/json",
+              )
+            }
+          >
+            Guardar JSON
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file !== undefined) void importFile(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+        {fileError !== null && (
+          <p className="error-box" role="alert">
+            {fileError}
+          </p>
+        )}
+        <p className="hint">
+          El navegador guarda tu trabajo entre sesiones. El JSON lleva el dibujo de las tres vistas, las piezas STL con sus mallas
+          y el modelo de masas: úsalo para copias y para pasarlo a otro equipo.
         </p>
-      )}
-      <p className="hint">
-        El navegador guarda tu trabajo entre sesiones. El JSON lleva el dibujo de las tres vistas, las piezas STL con sus mallas
-        y el modelo de masas: úsalo para copias y para pasarlo a otro equipo.
-      </p>
+      </Fold>
     </section>
   );
 }
