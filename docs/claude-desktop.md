@@ -88,6 +88,7 @@ Claude Desktop ──stdio (JSON-RPC, MCP)──► packages/mcp/src/server.ts �
 - El servidor no tiene dependencias: Node ejecuta el TypeScript directamente. Usa el mismo código que la app para el dibujo, las booleanas, el túnel y los archivos, así que lo que calcula Claude es lo que ves.
 - El diseño se guarda tras cada cambio en `~/.aeroforja/claude-desktop.aeroforja.json` (variable `AEROFORJA_PROJECT` para cambiarlo).
 - El puente escucha **solo en 127.0.0.1** (puerto 47615, variable `AEROFORJA_BRIDGE_PORT`). Nada sale de tu equipo. La app lo intenta cada pocos segundos y, si no está, no pasa nada.
+- **Varias ventanas de Claude**: cada ventana o sesión enlazada arranca su propio servidor, y solo uno puede usar el puerto. El que Claude está usando se lo pide al otro antes de cada herramienta y la app se reconecta a él al momento, así que siempre ves el diseño del Claude que trabaja; si los diseños difieren, la app te pregunta con cuál quedarte. Si el puerto lo tiene un servidor AeroForja antiguo (anterior a la 0.7.3) u otro programa, `app_status` lo dice y Claude te lo cuenta. Para ver quién lo ocupa: `Get-NetTCPConnection -LocalPort 47615 -State Listen` en PowerShell.
 - Las mallas STL no viajan al servidor: se quedan en el navegador. Por eso la masa de las piezas STL la cuenta la app, no `analyse`.
 - Si la app está servida desde tu VPS por HTTPS, Chrome puede pedir permiso para acceder a la red local la primera vez: acéptalo para que se conecte al puente.
 

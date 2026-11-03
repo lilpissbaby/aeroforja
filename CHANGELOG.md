@@ -2,6 +2,10 @@
 
 Formato: una entrada por entrega, lo más nuevo arriba. Cada cambio que afecta a resultados físicos enlaza su mini-diseño.
 
+## 0.7.3 · 03-11-2026
+
+- Corrección: con dos servidores AeroForja a la vez (cada ventana de Claude o sesión enlazada arranca el suyo), el segundo no podía abrir el puerto 47615 y trabajaba a ciegas: la app mostraba el diseño del otro y `app_status` decía «abre la app y se conecta sola». Ahora el servidor que Claude está usando toma el puente antes de cada herramienta (`POST /handover` al otro servidor AeroForja) y la app, avisada con un evento `handover`, se reconecta a él en menos de un segundo. Un servidor AeroForja antiguo o cualquier otro programa en el puerto se informa en `app_status` (`bridgeState`, con qué hacer) y no se pelea por él. `/handover` rechaza peticiones con cabecera `Origin`, así que una página web no puede quitar el puente. Sin cambios en la física.
+
 ## 0.7.2 · 03-11-2026
 
 - Corrección: la 0.7.1 seguía sin registrar el servidor en la build de Windows que también ejecuta sesiones de Cowork/Code, que guarda `claude_desktop_config.json` en `%LOCALAPPDATA%\Claude-Data\<perfil>\`, no en `%APPDATA%\Claude` ni en la ruta virtualizada de la Microsoft Store — confirmado con el botón «Editar configuración» de `Settings → Desarrollador` de una instalación real. `pnpm mcp:install` ahora también escribe ahí (una entrada por cada perfil que tengas); las otras dos rutas se mantienen como fallback. Guía ampliada con cómo comprobarlo desde la propia app.

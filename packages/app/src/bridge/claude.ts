@@ -12,6 +12,8 @@ import { useAppStore, type AppState } from "../state/store.ts";
 
 export const BRIDGE_URL = "http://127.0.0.1:47615";
 const RETRY_MS = 8000;
+/** Another AeroForja server (another Claude window) is taking the port: it listens again within a moment. */
+const HANDOVER_RETRY_MS = 400;
 
 export interface ClaudeLink {
   readonly status: "off" | "connected";
@@ -91,6 +93,16 @@ export function startClaudeBridge(): () => void {
         const data = JSON.parse((e as MessageEvent<string>).data) as { project: unknown };
         if (useClaudeLink.getState().conflict !== null) pendingRemote = data.project;
         else apply(data.project);
+      });
+      source.addEventListener("handover", () => {
+        // The Claude now working runs another server: follow it at once, and decide again
+        // on its design (a pending choice about the previous server's design no longer applies).
+        source?.close();
+        source = null;
+        pendingRemote = null;
+        useClaudeLink.setState({ status: "off", conflict: null });
+        clearTimeout(timer);
+        timer = setTimeout(() => void connect(), HANDOVER_RETRY_MS);
       });
       source.onerror = () => {
         source?.close();

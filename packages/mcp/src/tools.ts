@@ -22,6 +22,7 @@ import { analysePlanform } from "../../app/src/planform/geometry.ts";
 import { DEFAULT_FRAME, DEFAULT_WING, frameElements, frameParamsProblems, wingElements, wingParamsProblems, type FrameParams, type WingParams } from "../../app/src/planform/templates.ts";
 import { sweepAlphas, tunnelGeometry } from "../../app/src/tunnel/input.ts";
 import { elementFromInput, elementToOutput, round, type ElementInput, type ProjectStore } from "./project.ts";
+import type { BridgeState } from "./bridge.ts";
 import { renderThreeViews } from "./render.ts";
 
 export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: "image/png" };
@@ -42,6 +43,27 @@ export interface ToolDefinition {
 export interface BridgeInfo {
   readonly url: string | null;
   readonly browsers: () => number;
+  readonly state?: () => BridgeState;
+  /** Takes the bridge for this server before a tool runs (see bridge.ts). */
+  readonly ensure?: () => Promise<void>;
+}
+
+/** What app_status tells Claude about the bridge, so it can tell the user why the app does or does not follow. */
+export function bridgeHint(state: BridgeState, browsers: number): string {
+  switch (state.kind) {
+    case "serving":
+      return browsers > 0
+        ? "Changes appear in the app as you make them."
+        : `Open the AeroForja app on this computer (pnpm dev, or the Docker image): it connects to ${state.url} by itself within a few seconds.`;
+    case "elsewhere":
+      return `Another AeroForja server (another Claude window or session) holds port ${state.port} and could not hand it over just now: the app shows that server's design, not yours. Tell the user; calling any tool again retries.`;
+    case "legacy-server":
+      return `An older AeroForja server, which cannot hand over the bridge, holds port ${state.port} (probably started by another Claude window): the app shows that server's design, not yours. Tell the user to close that Claude window or end that node process (PowerShell: Get-NetTCPConnection -LocalPort ${state.port} -State Listen), then call any tool again.`;
+    case "other-program":
+      return `Port ${state.port} is used by another program (${state.detail}): the app cannot reach this server and does not show your changes. Tell the user to free the port.`;
+    case "closed":
+      return "The bridge is closed: the app does not show your changes.";
+  }
 }
 
 const text = (t: string): ToolResult => ({ content: [{ type: "text", text: t }] });
@@ -531,13 +553,17 @@ export const TOOLS: readonly ToolDefinition[] = [
     description: "Whether the AeroForja web app is connected to this server (it mirrors every change live) and where the project file is.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true },
-    run: (_a, store, bridge) =>
-      json({
+    run: (_a, store, bridge) => {
+      const state: BridgeState = bridge.state?.() ?? (bridge.url === null ? { kind: "closed" } : { kind: "serving", url: bridge.url });
+      const browsers = bridge.browsers();
+      return json({
         bridge: bridge.url,
-        browsersConnected: bridge.browsers(),
+        bridgeState: state.kind,
+        browsersConnected: browsers,
         revision: store.revision,
-        hint: bridge.browsers() === 0 ? "Open the AeroForja app on this computer (pnpm dev, or the Docker image) and it connects by itself." : "Changes appear in the app as you make them.",
-      }),
+        hint: bridgeHint(state, browsers),
+      });
+    },
   },
 ];
 
@@ -545,4 +571,6 @@ export const INSTRUCTIONS = `AeroForja is a drone design workbench with publishe
 
 Conventions: body axes FRD (x forward, y right, z DOWN), origin at the aircraft reference point, lengths in mm in tool inputs. The drawing has three views: top (planta: [x, y]), side (perfil: [x, z]) and front (alzado: [y, z]). Each element is a flat sheet in one view, extruded by its thickness around offset_mm along that view's normal. Symmetric aircraft: draw the right half with mirror: true.
 
-Workflow: get_design → apply_template or add_elements → render_views and compare with what the user described or with their reference image (proportions, positions) → fix → set_mass_components with the user's real masses (ask; mark guesses as ESTIMATED) → analyse → run_tunnel → explain results with their provenance (MEASURED, CALCULATED, ESTIMATED) and validity (green/amber/red). Never invent coefficients or present estimates as measured. If the user's design is unstable, unsafe or physically unworkable, say so.`;
+Workflow: get_design → apply_template or add_elements → render_views and compare with what the user described or with their reference image (proportions, positions) → fix → set_mass_components with the user's real masses (ask; mark guesses as ESTIMATED) → analyse → run_tunnel → explain results with their provenance (MEASURED, CALCULATED, ESTIMATED) and validity (green/amber/red). Never invent coefficients or present estimates as measured. If the user's design is unstable, unsafe or physically unworkable, say so.
+
+Live view: each Claude window runs its own AeroForja server and only one can feed the app; every tool call takes the bridge for this server. If app_status reports a bridgeState other than "serving", the app is not showing your changes: tell the user, with its hint.`;

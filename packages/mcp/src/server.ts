@@ -12,9 +12,9 @@
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_BRIDGE_PORT, startBridge, type Bridge } from "./bridge.ts";
+import { DEFAULT_BRIDGE_PORT, startBridge } from "./bridge.ts";
 import { ProjectStore } from "./project.ts";
-import { INSTRUCTIONS, TOOLS, type ToolResult } from "./tools.ts";
+import { INSTRUCTIONS, TOOLS, type BridgeInfo, type ToolResult } from "./tools.ts";
 
 export const SERVER_INFO = { name: "aeroforja", title: "AeroForja", version: "0.2.0" } as const;
 const SUPPORTED = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -29,7 +29,7 @@ interface Request {
 type Reply = { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string } };
 
 /** Handles one message; returns the reply, or null for notifications. */
-export async function handle(message: Request, store: ProjectStore, bridge: Pick<Bridge, "url" | "browsers">): Promise<Reply | null> {
+export async function handle(message: Request, store: ProjectStore, bridge: BridgeInfo): Promise<Reply | null> {
   const id = message.id ?? null;
   const isNotification = message.id === undefined;
   const ok = (result: unknown): Reply => ({ jsonrpc: "2.0", id, result });
@@ -63,6 +63,8 @@ export async function handle(message: Request, store: ProjectStore, bridge: Pick
       const name = String(message.params?.["name"] ?? "");
       const tool = TOOLS.find((t) => t.name === name);
       if (tool === undefined) return err(-32602, `Unknown tool: ${name}`);
+      // The Claude that is working takes the browser bridge, so the app shows its design.
+      await bridge.ensure?.();
       let result: ToolResult;
       try {
         result = await tool.run((message.params?.["arguments"] as Record<string, unknown> | undefined) ?? {}, store, bridge);
