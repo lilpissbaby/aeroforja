@@ -2,6 +2,10 @@
 
 Formato: una entrada por entrega, lo más nuevo arriba. Cada cambio que afecta a resultados físicos enlaza su mini-diseño.
 
+## 0.7.2 · 03-11-2026
+
+- Corrección: la 0.7.1 seguía sin registrar el servidor en la build de Windows que también ejecuta sesiones de Cowork/Code, que guarda `claude_desktop_config.json` en `%LOCALAPPDATA%\Claude-Data\<perfil>\`, no en `%APPDATA%\Claude` ni en la ruta virtualizada de la Microsoft Store — confirmado con el botón «Editar configuración» de `Settings → Desarrollador` de una instalación real. `pnpm mcp:install` ahora también escribe ahí (una entrada por cada perfil que tengas); las otras dos rutas se mantienen como fallback. Guía ampliada con cómo comprobarlo desde la propia app.
+
 ## 0.7.1 · 03-11-2026
 
 - Corrección: `pnpm mcp:install` no registraba el servidor en Claude Desktop instalado desde la Microsoft Store, que lee su configuración de la carpeta virtualizada de su paquete y no de `%APPDATA%\Claude`. Ahora escribe en las dos; un `APPDATA` o `XDG_CONFIG_HOME` vacío ya no da una ruta relativa. Sección «Si Claude Desktop no muestra aeroforja» en la [guía](docs/claude-desktop.md).

@@ -10,11 +10,24 @@
  *   macOS    ~/Library/Application Support/Claude/claude_desktop_config.json
  *   Linux    ~/.config/Claude/claude_desktop_config.json
  *
- * The Microsoft Store (MSIX) build on Windows does not read %APPDATA%: the
- * package's AppData is virtualized to
+ * Neither is where the current Windows build actually keeps it. Two things
+ * we found by inspecting a real install (none of this is documented):
+ *
+ * - The build that also runs Cowork/Code sessions keeps its live config,
+ *   mixed with its own session and preference state, at
+ *   %LOCALAPPDATA%\Claude-Data\<profile>\claude_desktop_config.json
+ *   (the "Editar configuración" button in Settings → Desarrollador opens
+ *   this exact file). This is the one Settings → Desarrollador →
+ *   "Servidores MCP locales" reads, and the one that matters.
+ * - On a Microsoft Store (MSIX) install, the package's AppData is also
+ *   virtualized to
  *   %LOCALAPPDATA%\Packages\Claude_<publisher id>\LocalCache\Roaming\Claude\
- * (anthropics/claude-code issues 26073, 29100, 38830). When that package is
- * installed, the entry goes there too.
+ *   (anthropics/claude-code issues 26073, 29100, 38830). We write there too
+ *   in case some build reads it, though we have not confirmed one that does.
+ *
+ * Because Claude-Data's file is live app state, not a static config, write
+ * it only while Claude Desktop is fully closed — otherwise the running app
+ * can overwrite the entry when it next saves its own state.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
@@ -39,22 +52,25 @@ function listDirectories(dir: string): readonly string[] {
   }
 }
 
-/** Every config file Claude Desktop may read on this computer, most specific first. */
+/** Every config file Claude Desktop may read on this computer, most specific (most likely real) first. */
 export function configPaths(
   os: NodeJS.Platform = platform(),
   env: Readonly<Record<string, string | undefined>> = process.env,
   home: string = homedir(),
-  listPackages: (dir: string) => readonly string[] = listDirectories,
+  listDirs: (dir: string) => readonly string[] = listDirectories,
 ): string[] {
   // An empty variable counts as unset: it would otherwise give a path relative to the working directory.
   const dir = (name: string): string | undefined => (env[name] === "" ? undefined : env[name]);
   if (os === "win32") {
     const appData = dir("APPDATA") ?? win32.join(home, "AppData", "Roaming");
-    const packages = win32.join(dir("LOCALAPPDATA") ?? win32.join(home, "AppData", "Local"), "Packages");
-    const store = listPackages(packages)
+    const localAppData = dir("LOCALAPPDATA") ?? win32.join(home, "AppData", "Local");
+    const claudeData = win32.join(localAppData, "Claude-Data");
+    const profiles = listDirs(claudeData).map((name) => win32.join(claudeData, name, FILE));
+    const packages = win32.join(localAppData, "Packages");
+    const store = listDirs(packages)
       .filter((name) => MSIX_PACKAGE.test(name))
       .map((name) => win32.join(packages, name, "LocalCache", "Roaming", "Claude", FILE));
-    return [...store, win32.join(appData, "Claude", FILE)];
+    return [...profiles, ...store, win32.join(appData, "Claude", FILE)];
   }
   if (os === "darwin") return [posix.join(home, "Library", "Application Support", "Claude", FILE)];
   return [posix.join(dir("XDG_CONFIG_HOME") ?? posix.join(home, ".config"), "Claude", FILE)];
@@ -96,8 +112,13 @@ function main(): void {
     process.stdout.write(`${JSON.stringify({ mcpServers: { aeroforja: entry } }, null, 2)}\n`);
     return;
   }
+  const paths = configPaths();
+  if (paths.length === 0) {
+    process.stderr.write("No Claude Desktop config location found on this computer.\n");
+    process.exit(1);
+  }
   let failed = false;
-  for (const path of configPaths()) {
+  for (const path of paths) {
     try {
       const { created, backup } = register(path, entry);
       process.stdout.write(`AeroForja registered in ${path}${created ? " (new file)" : ` (backup: ${backup})`}\n`);
