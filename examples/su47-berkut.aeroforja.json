@@ -1,0 +1,272 @@
+{
+  "kind": "aeroforja.project",
+  "schemaVersion": 3,
+  "name": "Su-47 Berkut 1:20 (prueba MCP)",
+  "model": {
+    "_note": "Cuerpo de prueba sintético con números redondos, NO es un aparato real. Sustituye cada componente por tus piezas pesadas (procedencia MEASURED) y sus posiciones medidas. Unidades: kg, m, ejes cuerpo FRD (x adelante, y derecha, z abajo) desde el punto de referencia.",
+    "referencePoint": "centro del frame, placa superior",
+    "components": [
+      {
+        "id": "total-placeholder",
+        "name": "Masa total (marcador en el CG objetivo: 8 % de margen; sin datos reales)",
+        "mass": {
+          "value": 1.4,
+          "provenance": "ESTIMATED",
+          "standardUncertainty": 0.5
+        },
+        "position": {
+          "frame": "FRD",
+          "x": 0.018,
+          "y": 0,
+          "z": 0
+        },
+        "inertia": {
+          "kind": "box",
+          "size": {
+            "x": 0.3,
+            "y": 0.12,
+            "z": 0.06
+          }
+        }
+      }
+    ]
+  },
+  "planform": {
+    "elements": [
+      {
+        "id": "placa-1",
+        "name": "Fuselaje delantero (morro y cabina)",
+        "role": "plate",
+        "plane": "side",
+        "mirror": false,
+        "thickness": 0.08,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.635,
+            "v": 0.005
+          },
+          {
+            "u": 0.575,
+            "v": -0.0175
+          },
+          {
+            "u": 0.485,
+            "v": -0.03
+          },
+          {
+            "u": 0.425,
+            "v": -0.035
+          },
+          {
+            "u": 0.405,
+            "v": -0.0375
+          },
+          {
+            "u": 0.335,
+            "v": -0.065
+          },
+          {
+            "u": 0.235,
+            "v": -0.05
+          },
+          {
+            "u": 0.185,
+            "v": -0.045
+          },
+          {
+            "u": 0.185,
+            "v": 0.045
+          },
+          {
+            "u": 0.335,
+            "v": 0.0375
+          },
+          {
+            "u": 0.46,
+            "v": 0.03
+          },
+          {
+            "u": 0.56,
+            "v": 0.0175
+          }
+        ]
+      },
+      {
+        "id": "placa-2",
+        "name": "Cuerpo central (tomas de aire y motores)",
+        "role": "plate",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.09,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.26,
+            "v": 0
+          },
+          {
+            "u": 0.26,
+            "v": 0.1
+          },
+          {
+            "u": -0.165,
+            "v": 0.1
+          },
+          {
+            "u": -0.365,
+            "v": 0.075
+          },
+          {
+            "u": -0.365,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "placa-3",
+        "name": "Botal de cola",
+        "role": "plate",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.035,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.115,
+            "v": 0.085
+          },
+          {
+            "u": -0.115,
+            "v": 0.12
+          },
+          {
+            "u": -0.495,
+            "v": 0.12
+          },
+          {
+            "u": -0.495,
+            "v": 0.085
+          }
+        ]
+      },
+      {
+        "id": "ala-1",
+        "name": "Ala de flecha negativa (trapecio de referencia)",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.005,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.015,
+            "v": 0
+          },
+          {
+            "u": 0.137,
+            "v": 0.4175
+          },
+          {
+            "u": 0.067,
+            "v": 0.4175
+          },
+          {
+            "u": -0.28,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "ala-2",
+        "name": "Canard",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.003,
+        "offset": -0.025,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.225,
+            "v": 0.1
+          },
+          {
+            "u": 0.1118,
+            "v": 0.195
+          },
+          {
+            "u": 0.0668,
+            "v": 0.195
+          },
+          {
+            "u": 0.095,
+            "v": 0.1
+          }
+        ]
+      },
+      {
+        "id": "ala-3",
+        "name": "Estabilizador horizontal",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.003,
+        "offset": 0.01,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.315,
+            "v": 0.12
+          },
+          {
+            "u": -0.415,
+            "v": 0.22
+          },
+          {
+            "u": -0.465,
+            "v": 0.22
+          },
+          {
+            "u": -0.445,
+            "v": 0.12
+          }
+        ]
+      },
+      {
+        "id": "ala-4",
+        "name": "Deriva",
+        "role": "wing",
+        "plane": "side",
+        "mirror": true,
+        "thickness": 0.003,
+        "offset": 0.1025,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.195,
+            "v": -0.0175
+          },
+          {
+            "u": -0.355,
+            "v": -0.1775
+          },
+          {
+            "u": -0.42,
+            "v": -0.1775
+          },
+          {
+            "u": -0.395,
+            "v": -0.0175
+          }
+        ]
+      }
+    ]
+  },
+  "parts": [],
+  "meshes": {}
+}

@@ -1,0 +1,248 @@
+{
+  "kind": "aeroforja.project",
+  "schemaVersion": 3,
+  "name": "MiG-25 1:20 (prueba MCP)",
+  "model": {
+    "_note": "Cuerpo de prueba sintético con números redondos, NO es un aparato real. Sustituye cada componente por tus piezas pesadas (procedencia MEASURED) y sus posiciones medidas. Unidades: kg, m, ejes cuerpo FRD (x adelante, y derecha, z abajo) desde el punto de referencia.",
+    "referencePoint": "centro del frame, placa superior",
+    "components": [
+      {
+        "id": "total-placeholder",
+        "name": "Masa total (marcador sin datos reales: 2 EDF + bateria + estructura)",
+        "mass": {
+          "value": 1.5,
+          "provenance": "ESTIMATED",
+          "standardUncertainty": 0.5
+        },
+        "position": {
+          "frame": "FRD",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "inertia": {
+          "kind": "box",
+          "size": {
+            "x": 0.3,
+            "y": 0.12,
+            "z": 0.06
+          }
+        }
+      }
+    ]
+  },
+  "planform": {
+    "elements": [
+      {
+        "id": "placa-1",
+        "name": "Fuselaje delantero (morro y cabina)",
+        "role": "plate",
+        "plane": "side",
+        "mirror": false,
+        "thickness": 0.075,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.7,
+            "v": 0
+          },
+          {
+            "u": 0.65,
+            "v": -0.016
+          },
+          {
+            "u": 0.575,
+            "v": -0.0275
+          },
+          {
+            "u": 0.5,
+            "v": -0.034
+          },
+          {
+            "u": 0.47,
+            "v": -0.0375
+          },
+          {
+            "u": 0.42,
+            "v": -0.056
+          },
+          {
+            "u": 0.35,
+            "v": -0.05
+          },
+          {
+            "u": 0.35,
+            "v": 0.045
+          },
+          {
+            "u": 0.45,
+            "v": 0.04
+          },
+          {
+            "u": 0.55,
+            "v": 0.03
+          },
+          {
+            "u": 0.64,
+            "v": 0.0175
+          },
+          {
+            "u": 0.7,
+            "v": 0.004
+          }
+        ]
+      },
+      {
+        "id": "placa-2",
+        "name": "Cuerpo central (tomas de aire y motores)",
+        "role": "plate",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.1,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.39,
+            "v": 0
+          },
+          {
+            "u": 0.39,
+            "v": 0.115
+          },
+          {
+            "u": -0.175,
+            "v": 0.115
+          },
+          {
+            "u": -0.275,
+            "v": 0.105
+          },
+          {
+            "u": -0.415,
+            "v": 0.095
+          },
+          {
+            "u": -0.415,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "ala-1",
+        "name": "Ala (alta, trapecio de referencia)",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.006,
+        "offset": -0.05,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.185,
+            "v": 0
+          },
+          {
+            "u": -0.1305,
+            "v": 0.3505
+          },
+          {
+            "u": -0.2105,
+            "v": 0.3505
+          },
+          {
+            "u": -0.1735,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "ala-2",
+        "name": "Estabilizador horizontal",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.004,
+        "offset": 0.01,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.265,
+            "v": 0.095
+          },
+          {
+            "u": -0.414,
+            "v": 0.22
+          },
+          {
+            "u": -0.464,
+            "v": 0.22
+          },
+          {
+            "u": -0.43,
+            "v": 0.095
+          }
+        ]
+      },
+      {
+        "id": "ala-3",
+        "name": "Deriva",
+        "role": "wing",
+        "plane": "side",
+        "mirror": true,
+        "thickness": 0.003,
+        "offset": 0.0775,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.12,
+            "v": -0.05
+          },
+          {
+            "u": -0.334,
+            "v": -0.2
+          },
+          {
+            "u": -0.399,
+            "v": -0.2
+          },
+          {
+            "u": -0.35,
+            "v": -0.05
+          }
+        ]
+      },
+      {
+        "id": "ala-4",
+        "name": "Aleta ventral",
+        "role": "wing",
+        "plane": "side",
+        "mirror": true,
+        "thickness": 0.003,
+        "offset": 0.0675,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.19,
+            "v": 0.05
+          },
+          {
+            "u": -0.25,
+            "v": 0.0925
+          },
+          {
+            "u": -0.34,
+            "v": 0.0925
+          },
+          {
+            "u": -0.35,
+            "v": 0.05
+          }
+        ]
+      }
+    ]
+  },
+  "parts": [],
+  "meshes": {}
+}

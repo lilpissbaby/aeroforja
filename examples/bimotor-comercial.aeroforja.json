@@ -1,0 +1,236 @@
+{
+  "kind": "aeroforja.project",
+  "schemaVersion": 3,
+  "name": "Bimotor comercial (diseño propio)",
+  "model": {
+    "_note": "Cuerpo de prueba sintético con números redondos, NO es un aparato real. Sustituye cada componente por tus piezas pesadas (procedencia MEASURED) y sus posiciones medidas. Unidades: kg, m, ejes cuerpo FRD (x adelante, y derecha, z abajo) desde el punto de referencia.",
+    "referencePoint": "centro del frame, placa superior",
+    "components": [
+      {
+        "id": "total-placeholder",
+        "name": "Masa total (marcador en el CG objetivo: 30 % de la CMA; sin datos reales)",
+        "mass": {
+          "value": 1.8,
+          "provenance": "ESTIMATED",
+          "standardUncertainty": 0.6
+        },
+        "position": {
+          "frame": "FRD",
+          "x": -0.006900000000000001,
+          "y": 0,
+          "z": 0
+        },
+        "inertia": {
+          "kind": "box",
+          "size": {
+            "x": 0.3,
+            "y": 0.1,
+            "z": 0.08
+          }
+        }
+      }
+    ]
+  },
+  "planform": {
+    "elements": [
+      {
+        "id": "placa-1",
+        "name": "Fuselaje",
+        "role": "plate",
+        "plane": "side",
+        "mirror": false,
+        "thickness": 0.12,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.6234,
+            "v": 0.005
+          },
+          {
+            "u": 0.615,
+            "v": -0.02
+          },
+          {
+            "u": 0.6,
+            "v": -0.035
+          },
+          {
+            "u": 0.575,
+            "v": -0.05
+          },
+          {
+            "u": 0.54,
+            "v": -0.058
+          },
+          {
+            "u": 0.5,
+            "v": -0.06
+          },
+          {
+            "u": -0.3,
+            "v": -0.06
+          },
+          {
+            "u": -0.5266000000000001,
+            "v": -0.042
+          },
+          {
+            "u": -0.5266000000000001,
+            "v": -0.03
+          },
+          {
+            "u": -0.35,
+            "v": 0.03
+          },
+          {
+            "u": -0.25,
+            "v": 0.055
+          },
+          {
+            "u": -0.15,
+            "v": 0.06
+          },
+          {
+            "u": 0.48,
+            "v": 0.06
+          },
+          {
+            "u": 0.56,
+            "v": 0.05
+          },
+          {
+            "u": 0.6,
+            "v": 0.035
+          },
+          {
+            "u": 0.62,
+            "v": 0.018
+          }
+        ]
+      },
+      {
+        "id": "ala-1",
+        "name": "Ala (baja, flecha 25° en c/4, AR 9,5)",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.006,
+        "offset": 0.045,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.16340000000000002,
+            "v": 0
+          },
+          {
+            "u": -0.1504,
+            "v": 0.6
+          },
+          {
+            "u": -0.2087,
+            "v": 0.6
+          },
+          {
+            "u": -0.030899999999999997,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "placa-2",
+        "name": "Góndola motor",
+        "role": "plate",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.08,
+        "offset": 0.1,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": 0.1767,
+            "v": 0.164
+          },
+          {
+            "u": 0.1767,
+            "v": 0.244
+          },
+          {
+            "u": -0.01,
+            "v": 0.244
+          },
+          {
+            "u": -0.0433,
+            "v": 0.23
+          },
+          {
+            "u": -0.0433,
+            "v": 0.178
+          },
+          {
+            "u": -0.01,
+            "v": 0.164
+          }
+        ]
+      },
+      {
+        "id": "ala-2",
+        "name": "Estabilizador horizontal",
+        "role": "wing",
+        "plane": "top",
+        "mirror": true,
+        "thickness": 0.004,
+        "offset": -0.01,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.3785,
+            "v": 0
+          },
+          {
+            "u": -0.5325,
+            "v": 0.225
+          },
+          {
+            "u": -0.5844,
+            "v": 0.225
+          },
+          {
+            "u": -0.5266000000000001,
+            "v": 0
+          }
+        ]
+      },
+      {
+        "id": "ala-3",
+        "name": "Deriva",
+        "role": "wing",
+        "plane": "side",
+        "mirror": false,
+        "thickness": 0.004,
+        "offset": 0,
+        "shape": "polygon",
+        "points": [
+          {
+            "u": -0.303,
+            "v": -0.06
+          },
+          {
+            "u": -0.5052,
+            "v": -0.301
+          },
+          {
+            "u": -0.5835,
+            "v": -0.301
+          },
+          {
+            "u": -0.5266000000000001,
+            "v": -0.06
+          }
+        ]
+      }
+    ]
+  },
+  "parts": [],
+  "meshes": {}
+}
