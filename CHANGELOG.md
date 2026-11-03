@@ -2,6 +2,10 @@
 
 Formato: una entrada por entrega, lo más nuevo arriba. Cada cambio que afecta a resultados físicos enlaza su mini-diseño.
 
+## 0.7.1 · 03-11-2026
+
+- Corrección: `pnpm mcp:install` no registraba el servidor en Claude Desktop instalado desde la Microsoft Store, que lee su configuración de la carpeta virtualizada de su paquete y no de `%APPDATA%\Claude`. Ahora escribe en las dos; un `APPDATA` o `XDG_CONFIG_HOME` vacío ya no da una ruta relativa. Sección «Si Claude Desktop no muestra aeroforja» en la [guía](docs/claude-desktop.md).
+
 ## 0.7.0 · 02-11-2026
 
 - **Túnel CFD** ([mini-diseño 006](docs/design/006-tunel-cfd-lbm.md)), adelantado de la v2: Lattice Boltzmann D3Q19 en WebGPU sobre todo el cuerpo 3D del dron. Da Cp en la piel (medio e instantáneo), humo, líneas de corriente, cortes de Cp, velocidad y vorticidad con la rejilla, balanza media junto al VLM y «Validar en tu GPU». Validado frente a Taylor–Green, Schäfer–Turek y GPU = CPU.

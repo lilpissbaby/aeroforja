@@ -20,10 +20,27 @@ pnpm mcp:install
 | Sistema | Archivo |
 |---|---|
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Windows, instalado desde la Microsoft Store | `%LOCALAPPDATA%\Packages\Claude_<id>\LocalCache\Roaming\Claude\claude_desktop_config.json` |
 | macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
+La versión de la Microsoft Store no lee `%APPDATA%\Claude`: Windows le redirige esa carpeta a la de su paquete. Si el instalador encuentra ese paquete, escribe la entrada en los dos sitios y te dice en cuáles.
+
 Cierra Claude Desktop del todo (desde la bandeja del sistema o la barra de menús) y ábrelo otra vez. En el menú de herramientas o conectores aparece **aeroforja**. Con `pnpm mcp:install --print` ves la entrada sin escribir nada, por si prefieres pegarla a mano.
+
+### Si Claude Desktop no muestra aeroforja
+
+1. Comprueba qué archivos tienen la entrada (PowerShell):
+
+   ```powershell
+   $cfgs = @("$env:APPDATA\Claude\claude_desktop_config.json") + (Get-ChildItem "$env:LOCALAPPDATA\Packages" -Directory -Filter "Claude_*" | % { Join-Path $_.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json" })
+   foreach ($f in $cfgs) { "== $f"; if (Test-Path $f) { (Get-Content $f -Raw | ConvertFrom-Json).mcpServers.PSObject.Properties.Name } else { "(no existe)" } }
+   ```
+
+   Si `aeroforja` solo está en `%APPDATA%` y tienes la versión de la Store, vuelve a ejecutar `pnpm mcp:install` con esta versión del instalador.
+2. Cierra Claude del todo desde la bandeja; cerrar la ventana no basta, porque la configuración solo se lee al arrancar.
+3. Si aparece pero falla, su log está en la carpeta `logs` junto al archivo de configuración que usa la app (`mcp-server-aeroforja.log`).
+4. Para descartar el servidor, arráncalo a mano con `pnpm mcp`: debe escribir `AeroForja bridge on http://127.0.0.1:47615` y quedarse esperando. Sal con Ctrl+C.
 
 ## Usarlo
 
