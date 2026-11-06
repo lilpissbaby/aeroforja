@@ -38,6 +38,9 @@ Registro de las decisiones abiertas de la especificación y sus módulos, con la
 | 2026-11-01 | Mini-diseño 006 (túnel CFD) aprobado tal cual | mupsim | Regularizada + Smagorinsky C_s = 0,17; fuerzas en ámbar como máximo; 2 M celdas |
 | 2026-11-01 | Mini-diseño 007 (ráfaga y flexión) aprobado tal cual | mupsim | VLM no estacionario; U_ds = 2 m/s, H = 12,5 c̄; sin alivio inercial hasta medir la masa por área |
 | 2026-11-01 | Orden: primero el CFD (sirve a ala fija y multirrotor), después la ráfaga | mupsim | Va a probar los dos tipos de dron |
+| 2026-11-06 | Se dejan las fases PoC → MVP → v1 → v2: se trabaja la app completa | mupsim | Se mantienen el mini-diseño aprobado y los tests de validación de cada módulo físico |
+| 2026-11-06 | Taller: Elegoo Mars 2 Pro (resina), Kingroon KP5L (FDM) y cortadora 3032 con láser de diodo de 10 W y husillo de 500 W | mupsim | Volúmenes y límites en `docs/guia-fabricacion.md` §1; área de la 3032 pendiente |
+| 2026-11-06 | Guía de fabricación y montaje como base de las reglas del generador de piezas | Claude | `docs/guia-fabricacion.md`; copia en el proyecto (`claude/guia-fabricacion.md`) |
 | 2026-11-01 | Entrada y campo lejano del CFD con la densidad de la celda interior (no ρ = 1) | Claude, **pendiente de mupsim** | Con ρ = 1 el caudal del caso de Schäfer–Turek entraba un 7,3 % bajo; ver el mini-diseño 006 |
 | 2026-11-02 | Schäfer–Turek con U_máx de red 0,05 (el Mach de red del túnel) | Claude | Con 0,075 el CD sale +5,1 %; con 0,05, +4,1 % |
 | 2026-11-02 | Küssner comparado en la sección central del ala AR 40 y desde τ = 4 | Claude, **pendiente de mupsim** | En τ = 2 el VLM sale +24 % (activación de paneles a saltos); ver el mini-diseño 007 |
